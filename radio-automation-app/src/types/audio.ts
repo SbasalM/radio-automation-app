@@ -101,4 +101,78 @@ export interface AudioSettings {
   silenceThreshold: number // dB
   outputFormat: 'mp3' | 'wav' | 'aac'
   outputQuality: number // 1-10
+}
+
+// Voice Activity Detection interfaces
+export interface VoiceSegment {
+  startTime: number // seconds
+  endTime: number // seconds
+  confidence: number // 0-100%
+  hasBackgroundMusic: boolean
+  amplitude: number // Average amplitude for this segment
+  segmentType: 'voice' | 'music' | 'silence'
+}
+
+export interface VoiceActivityData {
+  segments: VoiceSegment[]
+  confidence: number // Overall confidence 0-100%
+  backgroundMusicPresent: boolean
+  totalVoiceDuration: number // seconds
+  totalSilenceDuration: number // seconds
+  analysisTimeMs: number
+}
+
+export interface PromoInsertionPoint {
+  timestamp: number // seconds where promo should be inserted
+  confidence: number // 0-100% confidence this is a good spot
+  suggestedPromoId?: string
+  gapDuration: number // How long the silence gap is
+  contextBefore: string // Description of content before this point
+  contextAfter: string // Description of content after this point
+  reason: string // Why this point was suggested
+}
+
+export interface PromoCategory {
+  id: string
+  name: string
+  description: string
+  timeSlots: ('morning' | 'afternoon' | 'evening' | 'late-night' | 'weekend')[]
+  priority: 'high' | 'medium' | 'low'
+  color: string // Hex color for UI display
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface PromoTagJob {
+  id: string
+  fileId: string
+  audioFile: AudioFile
+  voiceActivityData?: VoiceActivityData
+  detectedPoints: PromoInsertionPoint[]
+  selectedInsertions: PromoInsertion[]
+  status: 'pending' | 'analyzing' | 'ready-for-review' | 'processing' | 'completed' | 'failed'
+  progress: number // 0-100
+  settings: PromoTagSettings
+  startedAt?: Date
+  completedAt?: Date
+  error?: string
+  outputPath?: string
+}
+
+export interface PromoInsertion {
+  insertionPoint: PromoInsertionPoint
+  selectedPromo: PromoFile
+  crossfadeDuration: number // seconds
+  volumeAdjustment: number // dB
+  approved: boolean
+}
+
+export interface PromoTagSettings {
+  enabled: boolean
+  minimumGapDuration: number // seconds - minimum silence gap to consider
+  maximumInsertionsPerHour: number
+  confidenceThreshold: number // 0-100% - minimum confidence to auto-suggest
+  preferredCategories: string[] // Promo category IDs
+  backgroundMusicHandling: 'strict' | 'moderate' | 'lenient'
+  autoApproveHighConfidence: boolean // Auto-approve insertions above 90% confidence
 } 
