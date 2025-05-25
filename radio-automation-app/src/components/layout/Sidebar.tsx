@@ -5,7 +5,8 @@ import {
   Server, 
   Settings, 
   Mic,
-  Activity
+  Activity,
+  AudioLines
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
@@ -14,6 +15,7 @@ const navigation = [
   { name: 'Shows', href: '/shows', icon: Radio },
   { name: 'FTP Settings', href: '/ftp', icon: Server },
   { name: 'Processing', href: '/processing', icon: Activity },
+  { name: 'Audio Editing', href: '/audio', icon: AudioLines },
   { name: 'Promo Library', href: '/promos', icon: Mic },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]

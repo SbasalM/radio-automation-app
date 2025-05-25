@@ -27,25 +27,25 @@ Automatic promo tagging - intelligently detects when voices stop speaking and in
 - [x] File queue system  
 - [x] Basic processing pipeline
 
-### Phase 3: FTP Integration ⚡ CURRENT
-- [ ] FTP connection profiles
-- [ ] Download scheduler
-- [ ] Pattern matching
-- [ ] Queue integration
+### Phase 3: FTP Integration 
+- [x] FTP connection profiles
+- [x] Download scheduler
+- [x] Pattern matching
+- [x] Queue integration
 
-- Current Focus: FTP connection profiles and scheduling
+### Phase 4: Audio Processing 
+- [x] Waveform display
+- [x] Trim editor
+- [x] Audio normalization
+- [x] Export pipeline
 
-### Phase 4: Audio Processing
-- [ ] Waveform display
-- [ ] Trim editor
-- [ ] Audio normalization
-- [ ] Export pipeline
-
-### Phase 5: Promo Tagging System
+### Phase 5: Promo Tagging System ⚡ CURRENT
 - [ ] Voice activity detection
 - [ ] Promo library management
 - [ ] Auto-insertion algorithm
 - [ ] Testing & refinement
+
+- Current Focus: Voice activity detection and automatic promo insertion
 
 ### Phase 6: Polish & Deployment
 - [ ] Email notifications
