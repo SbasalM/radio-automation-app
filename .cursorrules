@@ -1,0 +1,57 @@
+# Radio Automation Flow System Rules
+
+## Project Overview
+We are building a radio automation system with these key features:
+- Built-in FTP client with scheduling
+- Watch folder monitoring  
+- Automatic promo tagging with voice detection
+- Per-show profile management
+- Real-time status dashboard
+- Light/dark theme support
+
+## Tech Stack (IMPORTANT - Use these specific versions)
+- React 18 with TypeScript
+- Vite (latest stable)
+- Tailwind CSS v3 (NOT v4 - stable version only)
+- Node.js + Express for backend
+- SQLite for data storage
+- shadcn/ui for UI components
+- Zustand for state management
+- Lucide React for icons
+
+## Development Environment
+- Project path contains spaces - be careful with terminal commands
+- OneDrive sync is active - may need to pause during heavy file operations
+- Use quotes around paths when necessary in scripts
+
+## Known Issues
+- If npm/vite commands fail, check if OneDrive sync is interfering
+- Terminal commands may need proper escaping for spaces in paths
+
+## Code Standards
+- Use TypeScript for all new files
+- Follow React functional components with hooks
+- Use meaningful variable names
+- Add comments for complex logic
+- Keep components under 200 lines
+- Use standard Tailwind classes (no custom utilities initially)
+
+## Project Structure
+- /src/components - Reusable UI components
+- /src/features - Feature-specific modules
+- /src/hooks - Custom React hooks
+- /src/services - Business logic and API calls
+- /src/store - Zustand state management
+- /src/types - TypeScript type definitions
+- /src/utils - Helper functions
+
+## Current Development Phase
+Phase: 1 - Foundation Setup
+Focus: Get core UI and routing working with proper theming
+
+## When generating code:
+1. Use stable package versions only
+2. Follow established patterns
+3. Test imports before using
+4. Include error handling
+5. Add proper TypeScript types
