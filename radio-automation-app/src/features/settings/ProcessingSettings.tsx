@@ -1,13 +1,115 @@
-import { AudioLines, Volume2, Zap, Sliders } from 'lucide-react'
+import { AudioLines, Volume2, Zap, Sliders, Info, Settings, Eye, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { useSettingsStore } from '@/store/settings-store'
+import { useShowStore } from '@/store/show-store'
+import { useState } from 'react'
 
 export function ProcessingSettings() {
   const { settings, updateProcessingDefaults } = useSettingsStore()
+  const { shows } = useShowStore()
   const { processing } = settings
+  const [showGlobalUsage, setShowGlobalUsage] = useState(false)
+
+  // Calculate show statistics
+  const showsUsingGlobal = shows.filter(show => show.processingOptions.useGlobalSettings)
+  const showsUsingCustom = shows.filter(show => !show.processingOptions.useGlobalSettings)
 
   return (
     <div className="space-y-6">
+      {/* Global Settings Info */}
+      <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/10">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <span className="text-blue-900 dark:text-blue-100">Global Audio Processing Settings</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowGlobalUsage(!showGlobalUsage)}
+              className="text-blue-700 border-blue-300 hover:bg-blue-100 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800/20"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              {showGlobalUsage ? 'Hide' : 'Show'} Usage
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-blue-800 dark:text-blue-200 text-sm space-y-2">
+            <p>
+              These are the default audio processing settings that apply to all shows unless overridden at the show level.
+            </p>
+            <div className="flex items-center justify-between bg-white dark:bg-blue-900/20 rounded-lg p-3 mt-3">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="font-medium">Shows using global settings:</span>
+                  <span className="bg-blue-100 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full text-xs font-medium">
+                    {showsUsingGlobal.length}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Settings className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  <span className="font-medium">Shows with custom settings:</span>
+                  <span className="bg-purple-100 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 px-2 py-1 rounded-full text-xs font-medium">
+                    {showsUsingCustom.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {showGlobalUsage && (
+              <div className="mt-4 space-y-3">
+                {showsUsingGlobal.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                      Shows Using Global Settings ({showsUsingGlobal.length})
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {showsUsingGlobal.map(show => (
+                        <div key={show.id} className="bg-white dark:bg-blue-900/20 rounded px-3 py-2 text-sm">
+                          <div className="font-medium text-blue-900 dark:text-blue-100">{show.name}</div>
+                          <div className="text-blue-600 dark:text-blue-300 text-xs">
+                            {show.enabled ? 'Active' : 'Disabled'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {showsUsingCustom.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                      Shows With Custom Settings ({showsUsingCustom.length})
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {showsUsingCustom.map(show => (
+                        <div key={show.id} className="bg-purple-50 dark:bg-purple-900/20 rounded px-3 py-2 text-sm border border-purple-200 dark:border-purple-700">
+                          <div className="font-medium text-purple-900 dark:text-purple-100">{show.name}</div>
+                          <div className="text-purple-600 dark:text-purple-300 text-xs">
+                            Custom audio processing • {show.enabled ? 'Active' : 'Disabled'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3 mt-3">
+                  <p className="text-yellow-800 dark:text-yellow-200 text-sm">
+                    <strong>Note:</strong> Changes to these global settings will only affect shows that have "Use Global Audio Settings" enabled. 
+                    Shows with custom settings will continue using their own audio processing configuration.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Audio Format Settings */}
       <Card>
         <CardHeader>
@@ -327,12 +429,12 @@ export function ProcessingSettings() {
       {/* Processing Preview */}
       <Card>
         <CardHeader>
-          <CardTitle>Processing Chain Preview</CardTitle>
+          <CardTitle>Global Processing Chain Preview</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              <strong>Processing Chain:</strong>
+              <strong>Processing Chain (for shows using global settings):</strong>
             </div>
             <div className="mt-2 space-y-1 text-sm">
               {processing.autoTrimSilence && (
@@ -356,6 +458,14 @@ export function ProcessingSettings() {
                 ({processing.sampleRate / 1000} kHz{processing.audioFormat === 'mp3' ? `, ${processing.bitRate} kbps` : ''})
               </div>
             </div>
+            
+            {showsUsingGlobal.length > 0 && (
+              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
+                <div className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Applied to {showsUsingGlobal.length} show{showsUsingGlobal.length !== 1 ? 's' : ''}</strong> currently using global settings.
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
