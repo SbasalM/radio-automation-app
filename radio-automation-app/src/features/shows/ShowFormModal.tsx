@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react'
 import { X, Settings, FileText, Music, Tags, Speaker } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { FilePatternInput } from './FilePatternInput'
 import { MetadataConfig } from './MetadataConfig'
 import { AudioProcessingConfig } from './AudioProcessingConfig'
+import { TrimEditor } from '@/components/audio/TrimEditor'
 import { useShowStore } from '@/store/show-store'
+import { audioService } from '@/services/audio-service'
 import type { ShowProfile, FilePattern, MetadataMapping, AdvancedAudioSettings, FileNamingRules, ProcessingOptions } from '@/types/show'
+import type { AudioFile, TrimPoints } from '@/types/audio'
 
 interface ShowFormModalProps {
   isOpen: boolean
@@ -14,6 +18,8 @@ interface ShowFormModalProps {
 }
 
 type TabType = 'general' | 'patterns' | 'metadata' | 'audio' | 'promo'
+type AudioSubSection = 'general' | 'quality' | 'effects' | 'advanced' | 'trim' | 'processing'
+type MetadataSubSection = 'extraction' | 'fields' | 'naming' | 'preview'
 
 // Default values to ensure all required fields are present
 const DEFAULT_AUDIO_SETTINGS: AdvancedAudioSettings = {
@@ -72,6 +78,9 @@ const DEFAULT_FILE_NAMING_RULES: FileNamingRules = {
 export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalProps) {
   const { addShow, updateShow } = useShowStore()
   const [activeTab, setActiveTab] = useState<TabType>('general')
+  const [audioSubSection, setAudioSubSection] = useState<AudioSubSection>('general')
+  const [metadataSubSection, setMetadataSubSection] = useState<MetadataSubSection>('extraction')
+  const [sampleAudioFile, setSampleAudioFile] = useState<AudioFile | null>(null)
   
   const [formData, setFormData] = useState<{
     name: string
@@ -224,6 +233,43 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
     }
 
     onClose()
+  }
+
+  // Load sample file for trim editor
+  const handleLoadSampleFile = async () => {
+    try {
+      // For demo purposes, create a mock audio file
+      const mockAudioFile: AudioFile = {
+        id: 'sample-' + Date.now(),
+        filename: 'sample-audio.mp3',
+        duration: 300, // 5 minutes
+        sampleRate: 44100,
+        channels: 2,
+        format: 'mp3',
+        fileSize: 8 * 1024 * 1024, // 8MB
+        filePath: '/sample/sample-audio.mp3',
+        createdAt: new Date(),
+        lastModified: new Date()
+      }
+      setSampleAudioFile(mockAudioFile)
+    } catch (error) {
+      console.error('Failed to load sample file:', error)
+      alert('Failed to load sample file')
+    }
+  }
+
+  // Save trim points to show profile
+  const handleSaveTrimPoints = (trimPoints: TrimPoints) => {
+    setFormData(prev => ({
+      ...prev,
+      trimSettings: {
+        startSeconds: trimPoints.startTime,
+        endSeconds: trimPoints.endTime,
+        fadeIn: trimPoints.fadeInDuration > 0,
+        fadeOut: trimPoints.fadeOutDuration > 0
+      }
+    }))
+    setSampleAudioFile(null)
   }
 
   const tabs = [
@@ -449,22 +495,148 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
             )}
 
             {activeTab === 'metadata' && (
-              <div>
-                <MetadataConfig
-                  metadataMapping={formData.metadataMapping}
-                  fileNamingRules={formData.fileNamingRules}
-                  onUpdateMapping={(metadataMapping: MetadataMapping) => setFormData({ ...formData, metadataMapping })}
-                  onUpdateNamingRules={(fileNamingRules: FileNamingRules) => setFormData({ ...formData, fileNamingRules })}
-                />
+              <div className="space-y-4">
+                {/* Sub-navigation for Metadata */}
+                <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  {[
+                    { id: 'extraction', label: 'Extraction Rules' },
+                    { id: 'fields', label: 'Metadata Fields' },
+                    { id: 'naming', label: 'File Naming' },
+                    { id: 'preview', label: 'Test & Preview' }
+                  ].map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setMetadataSubSection(id as MetadataSubSection)}
+                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        metadataSubSection === id
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Metadata Section Content */}
+                <div>
+                  <ErrorBoundary>
+                    <MetadataConfig
+                      metadataMapping={formData.metadataMapping}
+                      fileNamingRules={formData.fileNamingRules}
+                      onUpdateMapping={(metadataMapping: MetadataMapping) => setFormData({ ...formData, metadataMapping })}
+                      onUpdateNamingRules={(fileNamingRules: FileNamingRules) => setFormData({ ...formData, fileNamingRules })}
+                    />
+                  </ErrorBoundary>
+                </div>
               </div>
             )}
 
             {activeTab === 'audio' && (
-              <div>
-                <AudioProcessingConfig
-                  processingOptions={formData.processingOptions}
-                  onUpdateProcessingOptions={(processingOptions: ProcessingOptions) => setFormData({ ...formData, processingOptions })}
-                />
+              <div className="space-y-4">
+                {/* Sub-navigation for Audio Processing */}
+                <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  {[
+                    { id: 'general', label: 'General' },
+                    { id: 'quality', label: 'Audio Quality' },
+                    { id: 'effects', label: 'Effects' },
+                    { id: 'advanced', label: 'Advanced' },
+                    { id: 'trim', label: 'Trim Points' },
+                    { id: 'processing', label: 'Processing Chain' }
+                  ].map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setAudioSubSection(id as AudioSubSection)}
+                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        audioSubSection === id
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Audio Section Content */}
+                <div>
+                  {audioSubSection === 'trim' ? (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                          Trim Points Editor
+                        </h3>
+                        {!sampleAudioFile && (
+                          <Button
+                            type="button"
+                            onClick={handleLoadSampleFile}
+                            variant="outline"
+                          >
+                            Load Sample File
+                          </Button>
+                        )}
+                      </div>
+
+                      {sampleAudioFile ? (
+                        <ErrorBoundary>
+                          <TrimEditor
+                            audioFile={sampleAudioFile}
+                            onSave={handleSaveTrimPoints}
+                            onCancel={() => setSampleAudioFile(null)}
+                            initialTrimPoints={{
+                              startTime: formData.trimSettings.startSeconds,
+                              endTime: formData.trimSettings.endSeconds,
+                              fadeInDuration: formData.trimSettings.fadeIn ? 0.5 : 0,
+                              fadeOutDuration: formData.trimSettings.fadeOut ? 1.0 : 0
+                            }}
+                          />
+                        </ErrorBoundary>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <Music className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Load a sample audio file to configure trim points</p>
+                          <p className="text-sm mt-1">Trim settings will be applied to all processed files for this show</p>
+                        </div>
+                      )}
+
+                      {/* Current trim settings display */}
+                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Current Trim Settings</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Start: </span>
+                            <span className="font-mono">{formData.trimSettings.startSeconds}s</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">End: </span>
+                            <span className="font-mono">{formData.trimSettings.endSeconds}s</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Fade In: </span>
+                            <span className={formData.trimSettings.fadeIn ? 'text-green-600' : 'text-gray-500'}>
+                              {formData.trimSettings.fadeIn ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Fade Out: </span>
+                            <span className={formData.trimSettings.fadeOut ? 'text-green-600' : 'text-gray-500'}>
+                              {formData.trimSettings.fadeOut ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <ErrorBoundary>
+                      <AudioProcessingConfig
+                        processingOptions={formData.processingOptions}
+                        onUpdateProcessingOptions={(processingOptions: ProcessingOptions) => setFormData({ ...formData, processingOptions })}
+                      />
+                    </ErrorBoundary>
+                  )}
+                </div>
               </div>
             )}
 

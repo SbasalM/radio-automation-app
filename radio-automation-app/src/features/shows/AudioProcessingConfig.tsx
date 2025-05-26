@@ -7,6 +7,7 @@ import type { AdvancedAudioSettings, ProcessingOptions } from '@/types/show'
 interface AudioProcessingConfigProps {
   processingOptions: ProcessingOptions
   onUpdateProcessingOptions: (options: ProcessingOptions) => void
+  activeSection?: 'general' | 'quality' | 'effects' | 'advanced' | 'trim' | 'processing'
 }
 
 // Default audio settings for different show types
@@ -100,14 +101,46 @@ const PRESET_CONFIGS = [
   }
 ]
 
-export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOptions }: AudioProcessingConfigProps) {
-  const [activeSection, setActiveSection] = useState<'general' | 'audio' | 'effects' | 'advanced' | 'preview'>('general')
+export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOptions, activeSection }: AudioProcessingConfigProps) {
+  const [activeSectionState, setActiveSectionState] = useState<'general' | 'audio' | 'effects' | 'advanced' | 'preview'>('general')
+
+  // Provide default audio settings if undefined
+  const defaultAudioSettings: AdvancedAudioSettings = {
+    normalizationLevel: -16,
+    autoGain: true,
+    trimSilence: false,
+    silenceThreshold: -50,
+    silencePadding: 0.5,
+    fadeInDuration: 0,
+    fadeOutDuration: 0,
+    outputFormat: 'mp3',
+    sampleRate: 44100,
+    bitRate: 192,
+    enableCompression: false,
+    compressionRatio: 3,
+    compressionThreshold: -12,
+    enableLimiter: false,
+    limiterThreshold: -3,
+    enableEQ: false,
+    lowFreqGain: 0,
+    midFreqGain: 0,
+    highFreqGain: 0,
+    enableDeEsser: false,
+    deEsserThreshold: -20,
+    enableNoiseGate: false,
+    noiseGateThreshold: -60
+  }
+
+  const safeProcessingOptions: ProcessingOptions = {
+    ...processingOptions,
+    audioSettings: processingOptions.audioSettings || defaultAudioSettings
+  }
 
   const updateAudioSettings = (updates: Partial<AdvancedAudioSettings>) => {
     onUpdateProcessingOptions({
-      ...processingOptions,
+      ...safeProcessingOptions,
       audioSettings: {
-        ...processingOptions.audioSettings,
+        ...safeProcessingOptions.audioSettings,
         ...updates
       }
     })
@@ -119,14 +152,14 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
 
   const toggleGlobalSettings = () => {
     onUpdateProcessingOptions({
-      ...processingOptions,
-      useGlobalSettings: !processingOptions.useGlobalSettings
+      ...safeProcessingOptions,
+      useGlobalSettings: !safeProcessingOptions.useGlobalSettings
     })
   }
 
   const getProcessingChain = () => {
     const chain = []
-    const settings = processingOptions.audioSettings
+    const settings = safeProcessingOptions.audioSettings
 
     if (settings.enableNoiseGate) chain.push('Noise Gate')
     if (settings.trimSilence) chain.push('Silence Trim')
@@ -154,7 +187,7 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
               <label className="text-sm text-gray-600 dark:text-gray-400">Use Global Settings</label>
               <input
                 type="checkbox"
-                checked={processingOptions.useGlobalSettings}
+                checked={safeProcessingOptions.useGlobalSettings}
                 onChange={toggleGlobalSettings}
                 className="rounded focus:ring-2 focus:ring-blue-500"
               />
@@ -162,7 +195,7 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
           </CardTitle>
         </CardHeader>
         
-        {!processingOptions.useGlobalSettings && (
+        {!safeProcessingOptions.useGlobalSettings && (
           <CardContent>
             {/* Preset Selection */}
             <div className="mb-6">
@@ -192,10 +225,11 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
               ].map(({ id, label, icon: Icon }) => (
                 <Button
                   key={id}
-                  variant={activeSection === id ? 'default' : 'outline'}
-                  onClick={() => setActiveSection(id as any)}
+                  variant={activeSectionState === id ? 'default' : 'outline'}
+                  onClick={() => setActiveSectionState(id as any)}
                   size="sm"
                   className="flex items-center space-x-2"
+                  type="button"
                 >
                   <Icon className="h-4 w-4" />
                   <span>{label}</span>
@@ -204,20 +238,20 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
             </div>
 
             {/* General Settings */}
-            {activeSection === 'general' && (
+            {activeSectionState === 'general' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Normalization */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Normalization Level (LUFS): {processingOptions.audioSettings.normalizationLevel}
+                      Normalization Level (LUFS): {safeProcessingOptions.audioSettings.normalizationLevel}
                     </label>
                     <input
                       type="range"
                       min="-30"
                       max="-12"
                       step="0.5"
-                      value={processingOptions.audioSettings.normalizationLevel}
+                      value={safeProcessingOptions.audioSettings.normalizationLevel}
                       onChange={(e) => updateAudioSettings({ normalizationLevel: parseFloat(e.target.value) })}
                       className="w-full"
                     />
@@ -232,7 +266,7 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                     <label className="flex items-center space-x-2">
                       <input
                         type="checkbox"
-                        checked={processingOptions.audioSettings.autoGain}
+                        checked={safeProcessingOptions.audioSettings.autoGain}
                         onChange={(e) => updateAudioSettings({ autoGain: e.target.checked })}
                         className="rounded focus:ring-2 focus:ring-blue-500"
                       />
@@ -255,7 +289,7 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                       <label className="flex items-center space-x-2 mb-2">
                         <input
                           type="checkbox"
-                          checked={processingOptions.audioSettings.trimSilence}
+                          checked={safeProcessingOptions.audioSettings.trimSilence}
                           onChange={(e) => updateAudioSettings({ trimSilence: e.target.checked })}
                           className="rounded focus:ring-2 focus:ring-blue-500"
                         />
@@ -267,33 +301,33 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Threshold: {processingOptions.audioSettings.silenceThreshold} dB
+                        Threshold: {safeProcessingOptions.audioSettings.silenceThreshold} dB
                       </label>
                       <input
                         type="range"
                         min="-80"
                         max="-20"
                         step="1"
-                        value={processingOptions.audioSettings.silenceThreshold}
+                        value={safeProcessingOptions.audioSettings.silenceThreshold}
                         onChange={(e) => updateAudioSettings({ silenceThreshold: parseFloat(e.target.value) })}
                         className="w-full"
-                        disabled={!processingOptions.audioSettings.trimSilence}
+                        disabled={!safeProcessingOptions.audioSettings.trimSilence}
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Padding: {processingOptions.audioSettings.silencePadding}s
+                        Padding: {safeProcessingOptions.audioSettings.silencePadding}s
                       </label>
                       <input
                         type="range"
                         min="0"
                         max="2"
                         step="0.1"
-                        value={processingOptions.audioSettings.silencePadding}
+                        value={safeProcessingOptions.audioSettings.silencePadding}
                         onChange={(e) => updateAudioSettings({ silencePadding: parseFloat(e.target.value) })}
                         className="w-full"
-                        disabled={!processingOptions.audioSettings.trimSilence}
+                        disabled={!safeProcessingOptions.audioSettings.trimSilence}
                       />
                     </div>
                   </div>
@@ -306,14 +340,14 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Fade In: {processingOptions.audioSettings.fadeInDuration}s
+                        Fade In: {safeProcessingOptions.audioSettings.fadeInDuration}s
                       </label>
                       <input
                         type="range"
                         min="0"
                         max="5"
                         step="0.1"
-                        value={processingOptions.audioSettings.fadeInDuration}
+                        value={safeProcessingOptions.audioSettings.fadeInDuration}
                         onChange={(e) => updateAudioSettings({ fadeInDuration: parseFloat(e.target.value) })}
                         className="w-full"
                       />
@@ -321,14 +355,14 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Fade Out: {processingOptions.audioSettings.fadeOutDuration}s
+                        Fade Out: {safeProcessingOptions.audioSettings.fadeOutDuration}s
                       </label>
                       <input
                         type="range"
                         min="0"
                         max="5"
                         step="0.1"
-                        value={processingOptions.audioSettings.fadeOutDuration}
+                        value={safeProcessingOptions.audioSettings.fadeOutDuration}
                         onChange={(e) => updateAudioSettings({ fadeOutDuration: parseFloat(e.target.value) })}
                         className="w-full"
                       />
@@ -339,7 +373,7 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
             )}
 
             {/* Audio Quality Settings */}
-            {activeSection === 'audio' && (
+            {activeSectionState === 'audio' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -347,7 +381,7 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                       Output Format
                     </label>
                     <select
-                      value={processingOptions.audioSettings.outputFormat}
+                      value={safeProcessingOptions.audioSettings.outputFormat}
                       onChange={(e) => updateAudioSettings({ outputFormat: e.target.value as AdvancedAudioSettings['outputFormat'] })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -363,7 +397,7 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                       Sample Rate
                     </label>
                     <select
-                      value={processingOptions.audioSettings.sampleRate}
+                      value={safeProcessingOptions.audioSettings.sampleRate}
                       onChange={(e) => updateAudioSettings({ sampleRate: parseInt(e.target.value) as AdvancedAudioSettings['sampleRate'] })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -373,13 +407,13 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                     </select>
                   </div>
 
-                  {processingOptions.audioSettings.outputFormat === 'mp3' && (
+                  {safeProcessingOptions.audioSettings.outputFormat === 'mp3' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         MP3 Bit Rate
                       </label>
                       <select
-                        value={processingOptions.audioSettings.bitRate}
+                        value={safeProcessingOptions.audioSettings.bitRate}
                         onChange={(e) => updateAudioSettings({ bitRate: parseInt(e.target.value) as AdvancedAudioSettings['bitRate'] })}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
@@ -395,32 +429,32 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
             )}
 
             {/* Effects Settings */}
-            {activeSection === 'effects' && (
+            {activeSectionState === 'effects' && (
               <div className="space-y-6">
                 {/* Compression */}
                 <div className="space-y-4">
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
-                      checked={processingOptions.audioSettings.enableCompression}
+                      checked={safeProcessingOptions.audioSettings.enableCompression}
                       onChange={(e) => updateAudioSettings({ enableCompression: e.target.checked })}
                       className="rounded focus:ring-2 focus:ring-blue-500"
                     />
                     <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">Compression</h4>
                   </div>
                   
-                  {processingOptions.audioSettings.enableCompression && (
+                  {safeProcessingOptions.audioSettings.enableCompression && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Ratio: {processingOptions.audioSettings.compressionRatio}:1
+                          Ratio: {safeProcessingOptions.audioSettings.compressionRatio}:1
                         </label>
                         <input
                           type="range"
                           min="1"
                           max="10"
                           step="0.5"
-                          value={processingOptions.audioSettings.compressionRatio}
+                          value={safeProcessingOptions.audioSettings.compressionRatio}
                           onChange={(e) => updateAudioSettings({ compressionRatio: parseFloat(e.target.value) })}
                           className="w-full"
                         />
@@ -428,14 +462,14 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Threshold: {processingOptions.audioSettings.compressionThreshold} dB
+                          Threshold: {safeProcessingOptions.audioSettings.compressionThreshold} dB
                         </label>
                         <input
                           type="range"
                           min="-30"
                           max="-6"
                           step="0.5"
-                          value={processingOptions.audioSettings.compressionThreshold}
+                          value={safeProcessingOptions.audioSettings.compressionThreshold}
                           onChange={(e) => updateAudioSettings({ compressionThreshold: parseFloat(e.target.value) })}
                           className="w-full"
                         />
@@ -449,24 +483,24 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
-                      checked={processingOptions.audioSettings.enableLimiter}
+                      checked={safeProcessingOptions.audioSettings.enableLimiter}
                       onChange={(e) => updateAudioSettings({ enableLimiter: e.target.checked })}
                       className="rounded focus:ring-2 focus:ring-blue-500"
                     />
                     <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">Limiter</h4>
                   </div>
                   
-                  {processingOptions.audioSettings.enableLimiter && (
+                  {safeProcessingOptions.audioSettings.enableLimiter && (
                     <div className="ml-6">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Threshold: {processingOptions.audioSettings.limiterThreshold} dB
+                        Threshold: {safeProcessingOptions.audioSettings.limiterThreshold} dB
                       </label>
                       <input
                         type="range"
                         min="-6"
                         max="0"
                         step="0.1"
-                        value={processingOptions.audioSettings.limiterThreshold}
+                        value={safeProcessingOptions.audioSettings.limiterThreshold}
                         onChange={(e) => updateAudioSettings({ limiterThreshold: parseFloat(e.target.value) })}
                         className="w-full"
                       />
@@ -479,25 +513,25 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
-                      checked={processingOptions.audioSettings.enableEQ}
+                      checked={safeProcessingOptions.audioSettings.enableEQ}
                       onChange={(e) => updateAudioSettings({ enableEQ: e.target.checked })}
                       className="rounded focus:ring-2 focus:ring-blue-500"
                     />
                     <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">EQ (3-Band)</h4>
                   </div>
                   
-                  {processingOptions.audioSettings.enableEQ && (
+                  {safeProcessingOptions.audioSettings.enableEQ && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 ml-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Low: {processingOptions.audioSettings.lowFreqGain > 0 ? '+' : ''}{processingOptions.audioSettings.lowFreqGain} dB
+                          Low: {safeProcessingOptions.audioSettings.lowFreqGain > 0 ? '+' : ''}{safeProcessingOptions.audioSettings.lowFreqGain} dB
                         </label>
                         <input
                           type="range"
                           min="-12"
                           max="12"
                           step="0.5"
-                          value={processingOptions.audioSettings.lowFreqGain}
+                          value={safeProcessingOptions.audioSettings.lowFreqGain}
                           onChange={(e) => updateAudioSettings({ lowFreqGain: parseFloat(e.target.value) })}
                           className="w-full"
                         />
@@ -505,14 +539,14 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Mid: {processingOptions.audioSettings.midFreqGain > 0 ? '+' : ''}{processingOptions.audioSettings.midFreqGain} dB
+                          Mid: {safeProcessingOptions.audioSettings.midFreqGain > 0 ? '+' : ''}{safeProcessingOptions.audioSettings.midFreqGain} dB
                         </label>
                         <input
                           type="range"
                           min="-12"
                           max="12"
                           step="0.5"
-                          value={processingOptions.audioSettings.midFreqGain}
+                          value={safeProcessingOptions.audioSettings.midFreqGain}
                           onChange={(e) => updateAudioSettings({ midFreqGain: parseFloat(e.target.value) })}
                           className="w-full"
                         />
@@ -520,14 +554,14 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          High: {processingOptions.audioSettings.highFreqGain > 0 ? '+' : ''}{processingOptions.audioSettings.highFreqGain} dB
+                          High: {safeProcessingOptions.audioSettings.highFreqGain > 0 ? '+' : ''}{safeProcessingOptions.audioSettings.highFreqGain} dB
                         </label>
                         <input
                           type="range"
                           min="-12"
                           max="12"
                           step="0.5"
-                          value={processingOptions.audioSettings.highFreqGain}
+                          value={safeProcessingOptions.audioSettings.highFreqGain}
                           onChange={(e) => updateAudioSettings({ highFreqGain: parseFloat(e.target.value) })}
                           className="w-full"
                         />
@@ -539,31 +573,31 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
             )}
 
             {/* Advanced Settings */}
-            {activeSection === 'advanced' && (
+            {activeSectionState === 'advanced' && (
               <div className="space-y-6">
                 {/* De-Esser */}
                 <div className="space-y-4">
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
-                      checked={processingOptions.audioSettings.enableDeEsser}
+                      checked={safeProcessingOptions.audioSettings.enableDeEsser}
                       onChange={(e) => updateAudioSettings({ enableDeEsser: e.target.checked })}
                       className="rounded focus:ring-2 focus:ring-blue-500"
                     />
                     <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">De-Esser</h4>
                   </div>
                   
-                  {processingOptions.audioSettings.enableDeEsser && (
+                  {safeProcessingOptions.audioSettings.enableDeEsser && (
                     <div className="ml-6">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Threshold: {processingOptions.audioSettings.deEsserThreshold} dB
+                        Threshold: {safeProcessingOptions.audioSettings.deEsserThreshold} dB
                       </label>
                       <input
                         type="range"
                         min="-30"
                         max="-10"
                         step="1"
-                        value={processingOptions.audioSettings.deEsserThreshold}
+                        value={safeProcessingOptions.audioSettings.deEsserThreshold}
                         onChange={(e) => updateAudioSettings({ deEsserThreshold: parseFloat(e.target.value) })}
                         className="w-full"
                       />
@@ -576,24 +610,24 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
-                      checked={processingOptions.audioSettings.enableNoiseGate}
+                      checked={safeProcessingOptions.audioSettings.enableNoiseGate}
                       onChange={(e) => updateAudioSettings({ enableNoiseGate: e.target.checked })}
                       className="rounded focus:ring-2 focus:ring-blue-500"
                     />
                     <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">Noise Gate</h4>
                   </div>
                   
-                  {processingOptions.audioSettings.enableNoiseGate && (
+                  {safeProcessingOptions.audioSettings.enableNoiseGate && (
                     <div className="ml-6">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Threshold: {processingOptions.audioSettings.noiseGateThreshold} dB
+                        Threshold: {safeProcessingOptions.audioSettings.noiseGateThreshold} dB
                       </label>
                       <input
                         type="range"
                         min="-80"
                         max="-30"
                         step="1"
-                        value={processingOptions.audioSettings.noiseGateThreshold}
+                        value={safeProcessingOptions.audioSettings.noiseGateThreshold}
                         onChange={(e) => updateAudioSettings({ noiseGateThreshold: parseFloat(e.target.value) })}
                         className="w-full"
                       />
@@ -604,7 +638,7 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
             )}
 
             {/* Processing Chain Preview */}
-            {activeSection === 'preview' && (
+            {activeSectionState === 'preview' && (
               <div className="space-y-4">
                 <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">Processing Chain</h4>
                 
@@ -627,11 +661,11 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                 <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <h5 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Processing Summary</h5>
                   <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                    <div>Format: {processingOptions.audioSettings.outputFormat.toUpperCase()} @ {processingOptions.audioSettings.sampleRate / 1000} kHz</div>
-                    {processingOptions.audioSettings.outputFormat === 'mp3' && (
-                      <div>Bitrate: {processingOptions.audioSettings.bitRate} kbps</div>
+                    <div>Format: {safeProcessingOptions.audioSettings.outputFormat.toUpperCase()} @ {safeProcessingOptions.audioSettings.sampleRate / 1000} kHz</div>
+                    {safeProcessingOptions.audioSettings.outputFormat === 'mp3' && (
+                      <div>Bitrate: {safeProcessingOptions.audioSettings.bitRate} kbps</div>
                     )}
-                    <div>Normalization: {processingOptions.audioSettings.normalizationLevel} LUFS</div>
+                    <div>Normalization: {safeProcessingOptions.audioSettings.normalizationLevel} LUFS</div>
                     <div>Processing steps: {getProcessingChain().length}</div>
                   </div>
                 </div>
@@ -640,7 +674,7 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
           </CardContent>
         )}
         
-        {processingOptions.useGlobalSettings && (
+        {safeProcessingOptions.useGlobalSettings && (
           <CardContent>
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <Settings className="h-12 w-12 mx-auto mb-4 opacity-50" />

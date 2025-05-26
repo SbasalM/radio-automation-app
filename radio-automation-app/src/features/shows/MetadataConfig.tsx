@@ -11,6 +11,7 @@ interface MetadataConfigProps {
   fileNamingRules: FileNamingRules
   onUpdateMapping: (mapping: MetadataMapping) => void
   onUpdateNamingRules: (rules: FileNamingRules) => void
+  activeSection?: 'extraction' | 'fields' | 'naming' | 'preview'
 }
 
 // Common regex patterns for quick selection
@@ -61,33 +62,54 @@ export function MetadataConfig({
   metadataMapping, 
   fileNamingRules, 
   onUpdateMapping, 
-  onUpdateNamingRules 
+  onUpdateNamingRules, 
+  activeSection 
 }: MetadataConfigProps) {
   const [activeTab, setActiveTab] = useState<'patterns' | 'extraction' | 'metadata' | 'naming' | 'test'>('patterns')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
 
+  // Provide default values if props are undefined
+  const safeMetadataMapping: MetadataMapping = metadataMapping || {
+    inputPatterns: [''],
+    extractionRules: [],
+    outputMetadata: {
+      title: '',
+      artist: '',
+      album: '',
+      genre: '',
+      customFields: {}
+    }
+  }
+
+  const safeFileNamingRules: FileNamingRules = fileNamingRules || {
+    outputPattern: '{showName}_{YYYY}-{MM}-{DD}',
+    dateFormat: 'YYYY-MM-DD',
+    caseConversion: 'none',
+    invalidCharacterHandling: 'underscore'
+  }
+
   // Pattern management
   const addInputPattern = () => {
     const newMapping = {
-      ...metadataMapping,
-      inputPatterns: [...metadataMapping.inputPatterns, '']
+      ...safeMetadataMapping,
+      inputPatterns: [...safeMetadataMapping.inputPatterns, '']
     }
     onUpdateMapping(newMapping)
   }
 
   const updateInputPattern = (index: number, pattern: string) => {
-    const newPatterns = [...metadataMapping.inputPatterns]
+    const newPatterns = [...safeMetadataMapping.inputPatterns]
     newPatterns[index] = pattern
     onUpdateMapping({
-      ...metadataMapping,
+      ...safeMetadataMapping,
       inputPatterns: newPatterns
     })
   }
 
   const removeInputPattern = (index: number) => {
-    const newPatterns = metadataMapping.inputPatterns.filter((_, i) => i !== index)
+    const newPatterns = safeMetadataMapping.inputPatterns.filter((_, i) => i !== index)
     onUpdateMapping({
-      ...metadataMapping,
+      ...safeMetadataMapping,
       inputPatterns: newPatterns
     })
   }
@@ -100,24 +122,24 @@ export function MetadataConfig({
       regexGroup: 1
     }
     onUpdateMapping({
-      ...metadataMapping,
-      extractionRules: [...metadataMapping.extractionRules, newRule]
+      ...safeMetadataMapping,
+      extractionRules: [...safeMetadataMapping.extractionRules, newRule]
     })
   }
 
   const updateExtractionRule = (index: number, rule: MetadataExtractionRule) => {
-    const newRules = [...metadataMapping.extractionRules]
+    const newRules = [...safeMetadataMapping.extractionRules]
     newRules[index] = rule
     onUpdateMapping({
-      ...metadataMapping,
+      ...safeMetadataMapping,
       extractionRules: newRules
     })
   }
 
   const removeExtractionRule = (index: number) => {
-    const newRules = metadataMapping.extractionRules.filter((_, i) => i !== index)
+    const newRules = safeMetadataMapping.extractionRules.filter((_, i) => i !== index)
     onUpdateMapping({
-      ...metadataMapping,
+      ...safeMetadataMapping,
       extractionRules: newRules
     })
   }
@@ -125,11 +147,19 @@ export function MetadataConfig({
   // Metadata management
   const updateMetadataField = (field: string, value: string) => {
     onUpdateMapping({
-      ...metadataMapping,
+      ...safeMetadataMapping,
       outputMetadata: {
-        ...metadataMapping.outputMetadata,
+        ...safeMetadataMapping.outputMetadata,
         [field]: value
       }
+    })
+  }
+
+  // File naming rules management
+  const updateFileNamingRule = (field: keyof FileNamingRules, value: any) => {
+    onUpdateNamingRules({
+      ...safeFileNamingRules,
+      [field]: value
     })
   }
 
@@ -144,9 +174,17 @@ export function MetadataConfig({
   }
 
   const insertCommonPattern = (pattern: string, patternIndex: number) => {
-    const currentPattern = metadataMapping.inputPatterns[patternIndex] || ''
+    const currentPattern = safeMetadataMapping.inputPatterns[patternIndex] || ''
     const newPattern = currentPattern + pattern
     updateInputPattern(patternIndex, newPattern)
+  }
+
+  // Handle tab changes safely
+  const handleTabChange = (tabId: string) => {
+    const validTabs = ['patterns', 'extraction', 'metadata', 'naming', 'test']
+    if (validTabs.includes(tabId)) {
+      setActiveTab(tabId as any)
+    }
   }
 
   return (
@@ -183,6 +221,7 @@ export function MetadataConfig({
                 onClick={() => selectedTemplate && loadTemplate(selectedTemplate)}
                 disabled={!selectedTemplate}
                 className="w-full"
+                type="button"
               >
                 Load Template
               </Button>
@@ -205,8 +244,9 @@ export function MetadataConfig({
               <Button
                 key={id}
                 variant={activeTab === id ? 'default' : 'outline'}
-                onClick={() => setActiveTab(id as any)}
+                onClick={() => handleTabChange(id)}
                 className="flex items-center space-x-2"
+                type="button"
               >
                 <Icon className="h-4 w-4" />
                 <span>{label}</span>
@@ -221,13 +261,13 @@ export function MetadataConfig({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Input Patterns</h3>
-                <Button onClick={addInputPattern} size="sm">
+                <Button onClick={addInputPattern} size="sm" type="button">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Pattern
                 </Button>
               </div>
 
-              {metadataMapping.inputPatterns.map((pattern, index) => (
+              {safeMetadataMapping.inputPatterns.map((pattern, index) => (
                 <div key={index} className="space-y-3 p-4 border rounded-lg">
                   <div className="flex items-center space-x-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -238,6 +278,7 @@ export function MetadataConfig({
                       size="sm"
                       onClick={() => removeInputPattern(index)}
                       className="text-red-600 hover:text-red-700"
+                      type="button"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -265,6 +306,7 @@ export function MetadataConfig({
                           onClick={() => insertCommonPattern(commonPattern.pattern, index)}
                           className="text-xs"
                           title={commonPattern.description}
+                          type="button"
                         >
                           {commonPattern.name}
                         </Button>
@@ -274,7 +316,7 @@ export function MetadataConfig({
                 </div>
               ))}
 
-              {metadataMapping.inputPatterns.length === 0 && (
+              {safeMetadataMapping.inputPatterns.length === 0 && (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No input patterns defined. Add a pattern to get started.</p>
@@ -288,13 +330,13 @@ export function MetadataConfig({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Extraction Rules</h3>
-                <Button onClick={addExtractionRule} size="sm">
+                <Button onClick={addExtractionRule} size="sm" type="button">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Rule
                 </Button>
               </div>
 
-              {metadataMapping.extractionRules.map((rule, index) => (
+              {safeMetadataMapping.extractionRules.map((rule, index) => (
                 <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -378,6 +420,7 @@ export function MetadataConfig({
                       variant="outline"
                       onClick={() => removeExtractionRule(index)}
                       className="w-full text-red-600 hover:text-red-700"
+                      type="button"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -385,7 +428,7 @@ export function MetadataConfig({
                 </div>
               ))}
 
-              {metadataMapping.extractionRules.length === 0 && (
+              {safeMetadataMapping.extractionRules.length === 0 && (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   <Settings2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No extraction rules defined. Add rules to extract data from filenames.</p>
@@ -407,7 +450,7 @@ export function MetadataConfig({
                     </label>
                     <input
                       type="text"
-                      value={(metadataMapping.outputMetadata[key as keyof typeof metadataMapping.outputMetadata] as string) || ''}
+                      value={(safeMetadataMapping.outputMetadata[key as keyof typeof safeMetadataMapping.outputMetadata] as string) || ''}
                       onChange={(e) => updateMetadataField(key, e.target.value)}
                       placeholder={placeholder}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -433,9 +476,9 @@ export function MetadataConfig({
                   </label>
                   <input
                     type="text"
-                    value={fileNamingRules.outputPattern}
-                    onChange={(e) => onUpdateNamingRules({ ...fileNamingRules, outputPattern: e.target.value })}
-                    placeholder="{ShowName}_{YYYY}-{MM}-{DD}_{Episode}"
+                    value={safeFileNamingRules.outputPattern}
+                    onChange={(e) => updateFileNamingRule('outputPattern', e.target.value)}
+                    placeholder="{ShowName}_{YYYY}-{MM}-{DD}"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -445,11 +488,8 @@ export function MetadataConfig({
                     Case Conversion
                   </label>
                   <select
-                    value={fileNamingRules.caseConversion}
-                    onChange={(e) => onUpdateNamingRules({ 
-                      ...fileNamingRules, 
-                      caseConversion: e.target.value as FileNamingRules['caseConversion'] 
-                    })}
+                    value={safeFileNamingRules.caseConversion}
+                    onChange={(e) => updateFileNamingRule('caseConversion', e.target.value as FileNamingRules['caseConversion'])}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="none">No Change</option>
@@ -465,11 +505,8 @@ export function MetadataConfig({
                     Invalid Character Handling
                   </label>
                   <select
-                    value={fileNamingRules.invalidCharacterHandling}
-                    onChange={(e) => onUpdateNamingRules({ 
-                      ...fileNamingRules, 
-                      invalidCharacterHandling: e.target.value as FileNamingRules['invalidCharacterHandling'] 
-                    })}
+                    value={safeFileNamingRules.invalidCharacterHandling}
+                    onChange={(e) => updateFileNamingRule('invalidCharacterHandling', e.target.value as FileNamingRules['invalidCharacterHandling'])}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="remove">Remove</option>
@@ -484,11 +521,8 @@ export function MetadataConfig({
                   </label>
                   <input
                     type="number"
-                    value={fileNamingRules.maxLength || ''}
-                    onChange={(e) => onUpdateNamingRules({ 
-                      ...fileNamingRules, 
-                      maxLength: e.target.value ? parseInt(e.target.value) : undefined 
-                    })}
+                    value={safeFileNamingRules.maxLength || ''}
+                    onChange={(e) => updateFileNamingRule('maxLength', e.target.value ? parseInt(e.target.value) : undefined)}
                     placeholder="No limit"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     min="10"
@@ -502,8 +536,8 @@ export function MetadataConfig({
           {/* Test & Preview Tab */}
           {activeTab === 'test' && (
             <PatternTester
-              metadataMapping={metadataMapping}
-              fileNamingRules={fileNamingRules}
+              metadataMapping={safeMetadataMapping}
+              fileNamingRules={safeFileNamingRules}
               onUpdateMapping={onUpdateMapping}
             />
           )}

@@ -6,7 +6,6 @@ import {
   Settings, 
   Mic,
   Activity,
-  AudioLines,
   Target,
   Zap
 } from 'lucide-react'
@@ -17,7 +16,6 @@ const navigation = [
   { name: 'Shows', href: '/shows', icon: Radio },
   { name: 'FTP Settings', href: '/ftp', icon: Server },
   { name: 'Processing', href: '/processing', icon: Activity },
-  { name: 'Audio Editing', href: '/audio', icon: AudioLines },
   { name: 'Promo Library', href: '/promos', icon: Mic },
   { name: 'Auto-Tagging', href: '/auto-tagging', icon: Zap },
   { name: 'Auto-Tag Dashboard', href: '/auto-tag', icon: Target },
