@@ -1,0 +1,53 @@
+{
+  "shows": [
+    {
+      "id": "morning-show-001",
+      "name": "Morning Show",
+      "description": "Daily morning show files",
+      "enabled": true,
+      "filePatterns": [
+        {
+          "id": "pattern_1",
+          "pattern": "MorningShow_*.mp3",
+          "type": "watch"
+        },
+        {
+          "id": "pattern_2",
+          "pattern": "MS_*.wav",
+          "type": "watch"
+        }
+      ],
+      "outputDirectory": "./output/morning-show",
+      "autoProcessing": true,
+      "createdAt": "2025-05-26T15:21:39.371Z",
+      "updatedAt": "2025-05-26T15:21:39.372Z"
+    },
+    {
+      "id": "evening-news-001",
+      "name": "Evening News",
+      "description": "Evening news segments",
+      "enabled": true,
+      "filePatterns": [
+        {
+          "id": "pattern_1",
+          "pattern": "EveningNews_*.mp3",
+          "type": "watch"
+        },
+        {
+          "id": "pattern_2",
+          "pattern": "News_*.wav",
+          "type": "watch"
+        }
+      ],
+      "outputDirectory": "./output/evening-news",
+      "autoProcessing": true,
+      "createdAt": "2025-05-26T15:21:39.372Z",
+      "updatedAt": "2025-05-26T15:21:39.372Z"
+    }
+  ],
+  "queue": [],
+  "settings": {
+    "version": "1.0.0",
+    "watchInterval": 5000
+  }
+}
