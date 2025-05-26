@@ -104,18 +104,22 @@ function FileItem({ file }: { file: QueuedFile }) {
     
     const settings = []
     
-    if (show.processingOptions.useGlobalSettings) {
+    if (show.processingOptions?.useGlobalSettings) {
       settings.push('Using global audio settings')
     } else {
-      const audio = show.processingOptions.audioSettings
-      settings.push(`Normalization: ${audio.normalizationLevel} LUFS`)
-      if (audio.enableCompression) settings.push('Compression enabled')
-      if (audio.enableEQ) settings.push('EQ enabled')
-      if (audio.trimSilence) settings.push('Silence trimming')
-      settings.push(`Output: ${audio.outputFormat.toUpperCase()} @ ${audio.bitRate}kbps`)
+      const audio = show.processingOptions?.audioSettings
+      if (audio) {
+        settings.push(`Normalization: ${audio.normalizationLevel || -16} LUFS`)
+        if (audio.enableCompression) settings.push('Compression enabled')
+        if (audio.enableEQ) settings.push('EQ enabled')
+        if (audio.trimSilence) settings.push('Silence trimming')
+        settings.push(`Output: ${(audio.outputFormat || 'mp3').toUpperCase()} @ ${audio.bitRate || 192}kbps`)
+      } else {
+        settings.push('Custom settings (not configured)')
+      }
     }
     
-    if (show.processingOptions.addPromoTag) {
+    if (show.processingOptions?.addPromoTag) {
       settings.push(`Promo tag: ${show.processingOptions.promoTagId || 'Default'}`)
     }
     
@@ -134,13 +138,17 @@ function FileItem({ file }: { file: QueuedFile }) {
           </div>
           <div className="flex items-center space-x-2 text-xs text-gray-600 dark:text-gray-400 mt-1">
             <span>{show?.name || 'Unknown Show'}</span>
-            {show?.processingOptions.useGlobalSettings ? (
+            {show?.processingOptions?.useGlobalSettings ? (
               <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
                 Global Settings
               </span>
-            ) : (
+            ) : show?.processingOptions ? (
               <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded">
                 Custom Settings
+              </span>
+            ) : (
+              <span className="bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded">
+                No Settings
               </span>
             )}
             {metadataPreview && (

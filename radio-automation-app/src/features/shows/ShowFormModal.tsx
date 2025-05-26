@@ -564,68 +564,105 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
                 <div>
                   {audioSubSection === 'trim' ? (
                     <div className="space-y-6">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                          Trim Points Editor
-                        </h3>
-                        {!sampleAudioFile && (
-                          <Button
-                            type="button"
-                            onClick={handleLoadSampleFile}
-                            variant="outline"
-                          >
-                            Load Sample File
-                          </Button>
-                        )}
-                      </div>
-
-                      {sampleAudioFile ? (
-                        <ErrorBoundary>
-                          <TrimEditor
-                            audioFile={sampleAudioFile}
-                            onSave={handleSaveTrimPoints}
-                            onCancel={() => setSampleAudioFile(null)}
-                            initialTrimPoints={{
-                              startTime: formData.trimSettings.startSeconds,
-                              endTime: formData.trimSettings.endSeconds,
-                              fadeInDuration: formData.trimSettings.fadeIn ? 0.5 : 0,
-                              fadeOutDuration: formData.trimSettings.fadeOut ? 1.0 : 0
-                            }}
-                          />
-                        </ErrorBoundary>
-                      ) : (
-                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                          <Music className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>Load a sample audio file to configure trim points</p>
-                          <p className="text-sm mt-1">Trim settings will be applied to all processed files for this show</p>
+                      {/* Current trim settings display - Always shown */}
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                            <Music className="h-5 w-5 mr-2 text-blue-600" />
+                            Current Trim Settings
+                          </h4>
+                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                            <div className={`h-2 w-2 rounded-full mr-2 ${
+                              formData.trimSettings.startSeconds > 0 || formData.trimSettings.endSeconds > 0 
+                                ? 'bg-green-500' 
+                                : 'bg-gray-400'
+                            }`}></div>
+                            {formData.trimSettings.startSeconds > 0 || formData.trimSettings.endSeconds > 0 
+                              ? 'Trim configured' 
+                              : 'No trim applied'
+                            }
+                          </div>
                         </div>
-                      )}
-
-                      {/* Current trim settings display */}
-                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                        <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Current Trim Settings</h4>
                         <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">Start: </span>
-                            <span className="font-mono">{formData.trimSettings.startSeconds}s</span>
+                          <div className="bg-white dark:bg-gray-800 p-3 rounded">
+                            <span className="text-gray-600 dark:text-gray-400">Start Trim: </span>
+                            <span className="font-mono font-medium">{formData.trimSettings.startSeconds}s</span>
                           </div>
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">End: </span>
-                            <span className="font-mono">{formData.trimSettings.endSeconds}s</span>
+                          <div className="bg-white dark:bg-gray-800 p-3 rounded">
+                            <span className="text-gray-600 dark:text-gray-400">End Trim: </span>
+                            <span className="font-mono font-medium">{formData.trimSettings.endSeconds}s</span>
                           </div>
-                          <div>
+                          <div className="bg-white dark:bg-gray-800 p-3 rounded">
                             <span className="text-gray-600 dark:text-gray-400">Fade In: </span>
-                            <span className={formData.trimSettings.fadeIn ? 'text-green-600' : 'text-gray-500'}>
+                            <span className={`font-medium ${formData.trimSettings.fadeIn ? 'text-green-600' : 'text-gray-500'}`}>
                               {formData.trimSettings.fadeIn ? 'Enabled' : 'Disabled'}
                             </span>
                           </div>
-                          <div>
+                          <div className="bg-white dark:bg-gray-800 p-3 rounded">
                             <span className="text-gray-600 dark:text-gray-400">Fade Out: </span>
-                            <span className={formData.trimSettings.fadeOut ? 'text-green-600' : 'text-gray-500'}>
+                            <span className={`font-medium ${formData.trimSettings.fadeOut ? 'text-green-600' : 'text-gray-500'}`}>
                               {formData.trimSettings.fadeOut ? 'Enabled' : 'Disabled'}
                             </span>
                           </div>
                         </div>
+                      </div>
+
+                      {/* Trim Editor Section */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                            Visual Trim Editor
+                          </h3>
+                          {!sampleAudioFile && (
+                            <Button
+                              type="button"
+                              onClick={handleLoadSampleFile}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                              size="lg"
+                            >
+                              <Music className="h-4 w-4 mr-2" />
+                              Load Sample Audio
+                            </Button>
+                          )}
+                        </div>
+
+                        {sampleAudioFile ? (
+                          <ErrorBoundary>
+                            <TrimEditor
+                              audioFile={sampleAudioFile}
+                              onSave={handleSaveTrimPoints}
+                              onCancel={() => setSampleAudioFile(null)}
+                              initialTrimPoints={{
+                                startTime: formData.trimSettings.startSeconds,
+                                endTime: formData.trimSettings.endSeconds,
+                                fadeInDuration: formData.trimSettings.fadeIn ? 0.5 : 0,
+                                fadeOutDuration: formData.trimSettings.fadeOut ? 1.0 : 0
+                              }}
+                            />
+                          </ErrorBoundary>
+                        ) : (
+                          <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8">
+                            <div className="text-center text-gray-500 dark:text-gray-400">
+                              <Music className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                              <h4 className="text-lg font-medium mb-2">Load Audio for Visual Editing</h4>
+                              <p className="mb-4">Load a sample audio file to visually set trim points with waveform display</p>
+                              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-4">
+                                <p className="text-sm text-blue-800 dark:text-blue-200">
+                                  <strong>Tip:</strong> Trim settings configured here will be applied to all files processed for this show. 
+                                  You can also manually set values in the Current Trim Settings above.
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                onClick={handleLoadSampleFile}
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                              >
+                                <Music className="h-4 w-4 mr-2" />
+                                Load Sample Audio File
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (

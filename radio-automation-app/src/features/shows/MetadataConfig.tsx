@@ -244,7 +244,11 @@ export function MetadataConfig({
               <Button
                 key={id}
                 variant={activeTab === id ? 'default' : 'outline'}
-                onClick={() => handleTabChange(id)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleTabChange(id)
+                }}
                 className="flex items-center space-x-2"
                 type="button"
               >
@@ -261,7 +265,11 @@ export function MetadataConfig({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Input Patterns</h3>
-                <Button onClick={addInputPattern} size="sm" type="button">
+                <Button onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  addInputPattern()
+                }} size="sm" type="button">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Pattern
                 </Button>
@@ -276,7 +284,11 @@ export function MetadataConfig({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => removeInputPattern(index)}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        removeInputPattern(index)
+                      }}
                       className="text-red-600 hover:text-red-700"
                       type="button"
                     >
@@ -303,7 +315,11 @@ export function MetadataConfig({
                           key={commonPattern.name}
                           variant="outline"
                           size="sm"
-                          onClick={() => insertCommonPattern(commonPattern.pattern, index)}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            insertCommonPattern(commonPattern.pattern, index)
+                          }}
                           className="text-xs"
                           title={commonPattern.description}
                           type="button"
@@ -330,7 +346,11 @@ export function MetadataConfig({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Extraction Rules</h3>
-                <Button onClick={addExtractionRule} size="sm" type="button">
+                <Button onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  addExtractionRule()
+                }} size="sm" type="button">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Rule
                 </Button>
@@ -418,7 +438,11 @@ export function MetadataConfig({
                   <div className="flex items-end">
                     <Button
                       variant="outline"
-                      onClick={() => removeExtractionRule(index)}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        removeExtractionRule(index)
+                      }}
                       className="w-full text-red-600 hover:text-red-700"
                       type="button"
                     >

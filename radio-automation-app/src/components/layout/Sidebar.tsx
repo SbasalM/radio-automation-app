@@ -5,7 +5,7 @@ import {
   Server, 
   Settings, 
   Mic,
-  Activity,
+  Monitor,
   Target,
   Zap
 } from 'lucide-react'
@@ -15,7 +15,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Shows', href: '/shows', icon: Radio },
   { name: 'FTP Settings', href: '/ftp', icon: Server },
-  { name: 'Processing', href: '/processing', icon: Activity },
+  { name: 'Queue Monitor', href: '/processing', icon: Monitor },
   { name: 'Promo Library', href: '/promos', icon: Mic },
   { name: 'Auto-Tagging', href: '/auto-tagging', icon: Zap },
   { name: 'Auto-Tag Dashboard', href: '/auto-tag', icon: Target },

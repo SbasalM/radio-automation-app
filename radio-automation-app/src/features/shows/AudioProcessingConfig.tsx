@@ -205,7 +205,14 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {PRESET_CONFIGS.map((preset) => (
                   <Card key={preset.name} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <CardContent className="p-4" onClick={() => loadPreset(preset)}>
+                    <CardContent 
+                      className="p-4" 
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        loadPreset(preset)
+                      }}
+                    >
                       <h5 className="font-medium text-gray-900 dark:text-gray-100">{preset.name}</h5>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{preset.description}</p>
                     </CardContent>
@@ -226,7 +233,11 @@ export function AudioProcessingConfig({ processingOptions, onUpdateProcessingOpt
                 <Button
                   key={id}
                   variant={activeSectionState === id ? 'default' : 'outline'}
-                  onClick={() => setActiveSectionState(id as any)}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setActiveSectionState(id as any)
+                  }}
                   size="sm"
                   className="flex items-center space-x-2"
                   type="button"
