@@ -39,16 +39,17 @@ Automatic promo tagging - intelligently detects when voices stop speaking and in
 - [x] Audio normalization
 - [x] Export pipeline
 
-### Phase 5: Promo Tagging System ⚡ CURRENT
-- [ ] Voice activity detection
-- [ ] Promo library management
-- [ ] Auto-insertion algorithm
-- [ ] Testing & refinement
+### Phase 5: Promo Tagging System 
+- [x] Voice activity detection
+- [x] Promo library management
+- [x] Auto-insertion algorithm
+- [x] Testing & refinement
 
-- Current Focus: Voice activity detection and automatic promo insertion
 
-### Phase 6: Polish & Deployment
+### Phase 6: Polish & Deployment ⚡ CURRENT
 - [ ] Email notifications
 - [ ] Calendar integration
 - [ ] Electron packaging
 - [ ] Performance optimization
+
+- Current Focus: Settings page and system configuration
