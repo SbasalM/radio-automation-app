@@ -1,148 +1,129 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ShowProfile, FilePattern } from '@/types/show'
+import { showApiService, type CreateShowRequest } from '@/services/show-api'
 
 interface ShowStore {
   shows: ShowProfile[]
-  addShow: (show: Omit<ShowProfile, 'id' | 'createdAt' | 'updatedAt'>) => void
-  updateShow: (id: string, updates: Partial<ShowProfile>) => void
-  deleteShow: (id: string) => void
+  loading: boolean
+  error: string | null
+  
+  // API actions
+  loadShows: () => Promise<void>
+  addShow: (show: CreateShowRequest) => Promise<void>
+  updateShow: (id: string, updates: Partial<ShowProfile>) => Promise<void>
+  deleteShow: (id: string) => Promise<void>
+  
+  // Local getters
   getShow: (id: string) => ShowProfile | undefined
   getAllShows: () => ShowProfile[]
   getActiveShows: () => ShowProfile[]
+  
+  // Error handling
+  clearError: () => void
 }
-
-// Mock data for demonstration
-const mockShows: ShowProfile[] = [
-  {
-    id: '1',
-    name: 'Morning Show',
-    enabled: true,
-    filePatterns: [
-      {
-        id: 'fp1',
-        pattern: 'MorningShow_*.mp3',
-        type: 'watch'
-      },
-      {
-        id: 'fp2', 
-        pattern: 'MS_*.*',
-        type: 'ftp',
-        ftpProfileId: 'ftp1'
-      }
-    ],
-    outputDirectory: '/processed/morning-show',
-    trimSettings: {
-      startSeconds: 2,
-      endSeconds: 1,
-      fadeIn: true,
-      fadeOut: true
-    },
-    processingOptions: {
-      normalize: true,
-      addPromoTag: true,
-      promoTagId: 'promo1'
-    },
-    createdAt: new Date('2024-01-15T08:00:00Z'),
-    updatedAt: new Date('2024-01-20T10:30:00Z')
-  },
-  {
-    id: '2',
-    name: 'Evening News',
-    enabled: true,
-    filePatterns: [
-      {
-        id: 'fp3',
-        pattern: 'EveningNews_*.wav',
-        type: 'watch'
-      }
-    ],
-    outputDirectory: '/processed/evening-news',
-    trimSettings: {
-      startSeconds: 0,
-      endSeconds: 0,
-      fadeIn: false,
-      fadeOut: false
-    },
-    processingOptions: {
-      normalize: true,
-      addPromoTag: false
-    },
-    createdAt: new Date('2024-01-10T16:00:00Z'),
-    updatedAt: new Date('2024-01-18T14:15:00Z')
-  },
-  {
-    id: '3',
-    name: 'Weekend Sports',
-    enabled: false,
-    filePatterns: [
-      {
-        id: 'fp4',
-        pattern: 'Sports_Weekend_*.*',
-        type: 'ftp',
-        ftpProfileId: 'ftp2'
-      }
-    ],
-    outputDirectory: '/processed/sports',
-    trimSettings: {
-      startSeconds: 3,
-      endSeconds: 2,
-      fadeIn: true,
-      fadeOut: true
-    },
-    processingOptions: {
-      normalize: false,
-      addPromoTag: true,
-      promoTagId: 'promo2'
-    },
-    createdAt: new Date('2024-01-05T12:00:00Z'),
-    updatedAt: new Date('2024-01-05T12:00:00Z')
-  }
-]
 
 export const useShowStore = create<ShowStore>()(
   persist(
     (set, get) => ({
-      shows: mockShows,
+      shows: [],
+      loading: false,
+      error: null,
       
-      addShow: (showData) => {
-        const newShow: ShowProfile = {
-          ...showData,
-          id: Date.now().toString(),
-          createdAt: new Date(),
-          updatedAt: new Date()
+      loadShows: async () => {
+        set({ loading: true, error: null })
+        try {
+          const shows = await showApiService.getAllShows()
+          set({ shows, loading: false })
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to load shows',
+            loading: false 
+          })
         }
-        set((state) => ({
-          shows: [...state.shows, newShow]
-        }))
       },
       
-      updateShow: (id, updates) => {
-        set((state) => ({
-          shows: state.shows.map((show) =>
-            show.id === id
-              ? { ...show, ...updates, updatedAt: new Date() }
-              : show
-          )
-        }))
+      addShow: async (showData) => {
+        set({ loading: true, error: null })
+        try {
+          const newShow = await showApiService.createShow(showData)
+          set((state) => {
+            const shows = Array.isArray(state.shows) ? state.shows : []
+            return {
+              shows: [...shows, newShow],
+              loading: false
+            }
+          })
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to create show',
+            loading: false 
+          })
+          throw error // Re-throw to let UI handle it
+        }
       },
       
-      deleteShow: (id) => {
-        set((state) => ({
-          shows: state.shows.filter((show) => show.id !== id)
-        }))
+      updateShow: async (id, updates) => {
+        set({ loading: true, error: null })
+        try {
+          const updatedShow = await showApiService.updateShow(id, updates)
+          set((state) => {
+            const shows = Array.isArray(state.shows) ? state.shows : []
+            return {
+              shows: shows.map((show) =>
+                show.id === id ? updatedShow : show
+              ),
+              loading: false
+            }
+          })
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update show',
+            loading: false 
+          })
+          throw error
+        }
+      },
+      
+      deleteShow: async (id) => {
+        set({ loading: true, error: null })
+        try {
+          await showApiService.deleteShow(id)
+          set((state) => {
+            const shows = Array.isArray(state.shows) ? state.shows : []
+            return {
+              shows: shows.filter((show) => show.id !== id),
+              loading: false
+            }
+          })
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to delete show',
+            loading: false 
+          })
+          throw error
+        }
       },
       
       getShow: (id) => {
-        return get().shows.find((show) => show.id === id)
+        const state = get()
+        const shows = Array.isArray(state.shows) ? state.shows : []
+        return shows.find((show) => show.id === id)
       },
       
       getAllShows: () => {
-        return get().shows
+        const state = get()
+        return Array.isArray(state.shows) ? state.shows : []
       },
       
       getActiveShows: () => {
-        return get().shows.filter((show) => show.enabled)
+        const state = get()
+        const shows = Array.isArray(state.shows) ? state.shows : []
+        return shows.filter((show) => show.enabled)
+      },
+
+      clearError: () => {
+        set({ error: null })
       }
     }),
     {

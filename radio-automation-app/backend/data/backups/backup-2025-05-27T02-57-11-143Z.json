@@ -1,0 +1,138 @@
+{
+  "shows": [
+    {
+      "name": "Answers in Genesis",
+      "description": "A short radio program about the worldviews and the creation of the world.",
+      "enabled": true,
+      "filePatterns": [
+        {
+          "id": "pattern_0",
+          "pattern": "AnswersInGenesis_{MM}{DD}{YY}.wav",
+          "type": "watch",
+          "watchPath": "watch"
+        }
+      ],
+      "outputDirectory": "output",
+      "autoProcessing": true,
+      "id": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
+      "createdAt": "2025-05-27T01:28:50.938Z",
+      "updatedAt": "2025-05-27T02:52:50.357Z",
+      "metadataMapping": {
+        "inputPatterns": [
+          ""
+        ],
+        "extractionRules": [],
+        "outputMetadata": {
+          "title": "AIG-{YYYY}-{MM-{DD}",
+          "artist": "Ken Ham",
+          "album": "Answers with Ken Ham",
+          "genre": "Short Programs",
+          "customFields": {},
+          "year": "{YYYY}",
+          "comment": "Test Comment"
+        }
+      },
+      "fileNamingRules": {
+        "outputPattern": "{showName}",
+        "dateFormat": "YYYY-MM-DD",
+        "caseConversion": "none",
+        "invalidCharacterHandling": "underscore"
+      },
+      "trimSettings": {
+        "startSeconds": 10,
+        "endSeconds": 0,
+        "fadeIn": false,
+        "fadeOut": false
+      },
+      "processingOptions": {
+        "normalize": true,
+        "addPromoTag": false,
+        "useGlobalSettings": true,
+        "audioSettings": {
+          "normalizationLevel": -16,
+          "autoGain": true,
+          "trimSilence": false,
+          "silenceThreshold": -50,
+          "silencePadding": 0.5,
+          "fadeInDuration": 0,
+          "fadeOutDuration": 0,
+          "outputFormat": "mp3",
+          "sampleRate": 44100,
+          "bitRate": 192,
+          "enableCompression": false,
+          "compressionRatio": 3,
+          "compressionThreshold": -12,
+          "enableLimiter": false,
+          "limiterThreshold": -3,
+          "enableEQ": false,
+          "lowFreqGain": 0,
+          "midFreqGain": 0,
+          "highFreqGain": 0,
+          "enableDeEsser": false,
+          "deEsserThreshold": -20,
+          "enableNoiseGate": false,
+          "noiseGateThreshold": -60
+        }
+      },
+      "processOnSchedule": false,
+      "schedulePattern": "",
+      "enableNotifications": false,
+      "notificationEmails": [],
+      "alertOnErrors": true,
+      "alertOnMissingFiles": false
+    }
+  ],
+  "queue": [
+    {
+      "filename": "AnswersInGenesis_052727",
+      "showId": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
+      "status": "failed",
+      "sourcePath": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\watch\\AnswersInGenesis_052727",
+      "id": "766b2cc5-bdd8-4d0b-ba98-26ec7a880701",
+      "addedAt": "2025-05-27T01:43:20.988Z",
+      "error": "Unsupported file extension: ",
+      "processedAt": "2025-05-27T01:43:20.993Z",
+      "processingTimeMs": 3
+    },
+    {
+      "filename": "AnswersInGenesis_052728",
+      "showId": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
+      "status": "failed",
+      "sourcePath": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\watch\\AnswersInGenesis_052728",
+      "id": "97439f40-29af-48a2-a7b8-d67347b43648",
+      "addedAt": "2025-05-27T01:43:27.422Z",
+      "error": "Unsupported file extension: ",
+      "processedAt": "2025-05-27T01:43:27.427Z",
+      "processingTimeMs": 3
+    },
+    {
+      "filename": "AnswersInGenesis_100424.wav",
+      "showId": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
+      "status": "completed",
+      "sourcePath": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\watch\\AnswersInGenesis_100424.wav",
+      "id": "ad34f8b2-1f8b-41f8-bd48-3ab528ce5a8f",
+      "addedAt": "2025-05-27T01:55:38.154Z",
+      "outputPath": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\processed\\Answers_in_Genesis_AnswersInGenesis_100424.wav",
+      "processedAt": "2025-05-27T01:55:38.173Z",
+      "processingTimeMs": 17
+    },
+    {
+      "filename": "AnswersInGenesis_052730.wav",
+      "showId": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
+      "status": "completed",
+      "sourcePath": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\watch\\AnswersInGenesis_052730.wav",
+      "id": "17309a70-3678-4df3-a4ff-3ec298050650",
+      "addedAt": "2025-05-27T01:58:37.547Z",
+      "outputPath": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\processed\\Answers_in_Genesis_AnswersInGenesis_052730.wav",
+      "processedAt": "2025-05-27T01:58:37.552Z",
+      "processingTimeMs": 4
+    }
+  ],
+  "settings": {
+    "version": "1.0.0",
+    "watchInterval": 5000,
+    "lastBackup": "2025-05-27T02:52:50.357Z",
+    "globalWatchDirectory": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\watch",
+    "globalOutputDirectory": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\output"
+  }
+}

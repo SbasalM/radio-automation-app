@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { 
   Eye, 
   Clock, 
@@ -9,7 +10,8 @@ import {
   AlertCircle,
   Info,
   CheckCircle2,
-  Server
+  Server,
+  RefreshCw
 } from 'lucide-react'
 import { useShowStore } from '@/store/show-store'
 import { useFileQueueStore } from '@/store/file-queue-store'
@@ -17,31 +19,81 @@ import { useMonitoringStore } from '@/store/monitoring-store'
 import { useFTPStore } from '@/store/ftp-store'
 import { FileStatus } from '@/types/file'
 import { formatNextRun } from '@/utils/cron-helper'
+import { clearAllAppData } from '@/utils/storage-migration'
 
 export function Dashboard() {
-  const { getActiveShows } = useShowStore()
+  const { getActiveShows, loadShows } = useShowStore()
   const { 
     getFilesByStatus, 
     getTodayCompletedCount, 
-    getQueuedFiles 
+    getQueuedFiles,
+    loadQueue
   } = useFileQueueStore()
   const { isMonitoring } = useMonitoringStore()
   const { getNextScheduledDownload } = useFTPStore()
   
   const [refreshKey, setRefreshKey] = useState(0)
+  const [showErrorOptions, setShowErrorOptions] = useState(false)
+
+  const handleClearData = () => {
+    if (confirm('This will clear all local data and reload the page. Are you sure?')) {
+      clearAllAppData()
+      window.location.reload()
+    }
+  }
+
+  // Load initial data
+  useEffect(() => {
+    loadShows()
+    loadQueue()
+  }, [])
 
   // Auto-refresh every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       setRefreshKey(prev => prev + 1)
+      loadQueue() // Refresh queue data
     }, 10000)
 
     return () => clearInterval(interval)
   }, [])
 
-  const activeShows = getActiveShows()
-  const queuedFiles = getFilesByStatus(FileStatus.PENDING).length + getFilesByStatus(FileStatus.PROCESSING).length
-  const processedToday = getTodayCompletedCount()
+  let activeShows, queuedFiles, processedToday
+  
+  try {
+    activeShows = getActiveShows()
+    queuedFiles = getFilesByStatus(FileStatus.PENDING).length + getFilesByStatus(FileStatus.PROCESSING).length
+    processedToday = getTodayCompletedCount()
+  } catch (error) {
+    console.error('Error loading dashboard data:', error)
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Dashboard
+          </h1>
+          <Button onClick={handleClearData} variant="outline" className="border-red-200 text-red-600 hover:bg-red-50">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Clear Data & Reload
+          </Button>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-red-600">Data Loading Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              There was an error loading the dashboard data. This might be due to corrupted localStorage data.
+            </p>
+            <Button onClick={handleClearData} variant="outline" className="border-red-200 text-red-600 hover:bg-red-50">
+              Clear All Data & Reload
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
   
   // Get next scheduled download
   const nextScheduled = getNextScheduledDownload()

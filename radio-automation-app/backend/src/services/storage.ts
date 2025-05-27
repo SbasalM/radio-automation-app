@@ -16,11 +16,56 @@ export interface ShowProfile {
     pattern: string
     type: 'ftp' | 'watch'
     ftpProfileId?: string
+    watchPath?: string // Per-pattern watch directory
   }>
   outputDirectory: string
   autoProcessing: boolean
   createdAt: Date
   updatedAt: Date
+  // Extended settings
+  metadataMapping?: {
+    inputPatterns: string[]
+    extractionRules: Array<{
+      field: string
+      source: 'regex' | 'static' | 'filename'
+      regexGroup?: number
+      staticValue?: string
+    }>
+    outputMetadata: {
+      title: string
+      artist: string
+      album: string
+      genre: string
+      customFields: Record<string, string>
+    }
+  }
+  fileNamingRules?: {
+    outputPattern: string
+    dateFormat: string
+    caseConversion: 'none' | 'uppercase' | 'lowercase' | 'titlecase'
+    invalidCharacterHandling: 'remove' | 'replace' | 'underscore'
+    replacementCharacter?: string
+    maxLength?: number
+  }
+  trimSettings?: {
+    startSeconds: number
+    endSeconds: number
+    fadeIn: boolean
+    fadeOut: boolean
+  }
+  processingOptions?: {
+    normalize: boolean
+    addPromoTag: boolean
+    promoTagId?: string
+    useGlobalSettings: boolean
+    audioSettings: any // Can be typed more specifically if needed
+  }
+  processOnSchedule?: boolean
+  schedulePattern?: string
+  enableNotifications?: boolean
+  notificationEmails?: string[]
+  alertOnErrors?: boolean
+  alertOnMissingFiles?: boolean
 }
 
 export interface StorageData {
@@ -30,6 +75,8 @@ export interface StorageData {
     version: string
     lastBackup?: Date
     watchInterval: number
+    globalWatchDirectory?: string // Global watch folder fallback
+    globalOutputDirectory?: string // Global output folder fallback
   }
 }
 
@@ -47,7 +94,9 @@ export class StorageService {
       queue: [],
       settings: {
         version: '1.0.0',
-        watchInterval: parseInt(process.env.WATCH_INTERVAL || '5000')
+        watchInterval: parseInt(process.env.WATCH_INTERVAL || '5000'),
+        globalWatchDirectory: process.env.GLOBAL_WATCH_DIR || path.join(process.cwd(), 'watch'),
+        globalOutputDirectory: process.env.GLOBAL_OUTPUT_DIR || path.join(process.cwd(), 'processed')
       }
     }
   }
@@ -120,8 +169,18 @@ export class StorageService {
     if (!this.data.settings) {
       this.data.settings = {
         version: '1.0.0',
-        watchInterval: 5000
+        watchInterval: 5000,
+        globalWatchDirectory: process.env.GLOBAL_WATCH_DIR || path.join(process.cwd(), 'watch'),
+        globalOutputDirectory: process.env.GLOBAL_OUTPUT_DIR || path.join(process.cwd(), 'processed')
       }
+    }
+    
+    // Add global directories if missing
+    if (!this.data.settings.globalWatchDirectory) {
+      this.data.settings.globalWatchDirectory = process.env.GLOBAL_WATCH_DIR || path.join(process.cwd(), 'watch')
+    }
+    if (!this.data.settings.globalOutputDirectory) {
+      this.data.settings.globalOutputDirectory = process.env.GLOBAL_OUTPUT_DIR || path.join(process.cwd(), 'processed')
     }
   }
 

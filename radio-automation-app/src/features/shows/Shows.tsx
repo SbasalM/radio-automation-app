@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Radio } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,10 +7,16 @@ import { useShowStore } from '@/store/show-store'
 import type { ShowProfile } from '@/types/show'
 
 export function Shows() {
-  const { shows, deleteShow, updateShow } = useShowStore()
+  const { getAllShows, deleteShow, updateShow, loadShows, loading, error } = useShowStore()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingShow, setEditingShow] = useState<ShowProfile | null>(null)
 
+  // Load shows from backend on component mount
+  useEffect(() => {
+    loadShows()
+  }, [])
+
+  const shows = getAllShows()
   const activeShows = shows.filter(show => show.enabled)
   const totalShows = shows.length
 
@@ -24,14 +30,24 @@ export function Shows() {
     setIsModalOpen(true)
   }
 
-  const handleDeleteShow = (id: string) => {
+  const handleDeleteShow = async (id: string) => {
     if (confirm('Are you sure you want to delete this show profile?')) {
-      deleteShow(id)
+      try {
+        await deleteShow(id)
+      } catch (error) {
+        console.error('Failed to delete show:', error)
+        alert('Failed to delete show. Please try again.')
+      }
     }
   }
 
-  const handleToggleShow = (show: ShowProfile) => {
-    updateShow(show.id, { enabled: !show.enabled })
+  const handleToggleShow = async (show: ShowProfile) => {
+    try {
+      await updateShow(show.id, { enabled: !show.enabled })
+    } catch (error) {
+      console.error('Failed to update show:', error)
+      alert('Failed to update show. Please try again.')
+    }
   }
 
   const formatDate = (date: Date) => {
@@ -40,6 +56,35 @@ export function Shows() {
       day: 'numeric',
       year: 'numeric'
     }).format(new Date(date))
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading shows...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="text-red-500 mb-4 text-2xl">⚠️</div>
+            <p className="text-red-600 mb-4">Failed to load shows: {error}</p>
+            <Button onClick={() => loadShows()} variant="outline">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -153,7 +198,7 @@ export function Shows() {
                 <tbody>
                   {shows.map((show) => (
                     <tr
-                      key={show.id}
+                      key={show.id || `show-${show.name}-${Date.now()}`}
                       className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                     >
                       <td className="py-4 px-4">
@@ -175,21 +220,21 @@ export function Shows() {
                       </td>
                       <td className="py-4 px-4">
                         <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {show.filePatterns.length} pattern{show.filePatterns.length !== 1 ? 's' : ''}
+                          {(show.filePatterns || []).length} pattern{(show.filePatterns || []).length !== 1 ? 's' : ''}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-500 font-mono">
-                          {show.filePatterns[0]?.pattern || 'No patterns'}
-                          {show.filePatterns.length > 1 && ` +${show.filePatterns.length - 1} more`}
+                          {(show.filePatterns || [])[0]?.pattern || 'No patterns'}
+                          {(show.filePatterns || []).length > 1 && ` +${(show.filePatterns || []).length - 1} more`}
                         </div>
                       </td>
                       <td className="py-4 px-4">
                         <div className="text-sm font-mono text-gray-600 dark:text-gray-400">
-                          {show.outputDirectory}
+                          {show.outputDirectory || 'Not configured'}
                         </div>
                       </td>
                       <td className="py-4 px-4">
                         <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {formatDate(show.updatedAt)}
+                          {show.updatedAt ? formatDate(show.updatedAt) : 'Recently created'}
                         </div>
                       </td>
                       <td className="py-4 px-4">

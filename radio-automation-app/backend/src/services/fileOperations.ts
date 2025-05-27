@@ -22,7 +22,7 @@ export class FileOperationsService {
   constructor() {
     this.allowedExtensions = (process.env.ALLOWED_EXTENSIONS || '.mp3,.wav,.flac,.aac,.m4a').split(',')
     this.tempDir = process.env.TEMP_DIR || './temp'
-    this.outputBaseDir = process.env.OUTPUT_BASE_DIR || './output'
+    this.outputBaseDir = process.env.OUTPUT_BASE_DIR || path.join(process.cwd(), 'processed')
   }
 
   async processFile(file: QueuedFile, show: ShowProfile): Promise<ProcessFileResult> {
@@ -47,10 +47,13 @@ export class FileOperationsService {
 
       // Generate output filename and path
       const outputFilename = this.generateOutputFilename(file.filename, show)
-      const outputPath = path.join(show.outputDirectory, outputFilename)
+      
+      // Use show's output directory or fall back to global default
+      const outputDir = show.outputDirectory || this.outputBaseDir
+      const outputPath = path.join(outputDir, outputFilename)
 
       // Ensure output directory exists
-      await fs.ensureDir(show.outputDirectory)
+      await fs.ensureDir(outputDir)
 
       // Check if output file already exists
       if (await fs.pathExists(outputPath)) {
@@ -91,13 +94,36 @@ export class FileOperationsService {
 
   private generateOutputFilename(originalFilename: string, show: ShowProfile): string {
     try {
-      // For now, use simple naming: ShowName_OriginalFilename
-      // Later this can be enhanced with metadata extraction and custom naming rules
       const ext = path.extname(originalFilename)
       const nameWithoutExt = path.basename(originalFilename, ext)
-      const cleanShowName = this.sanitizeFilename(show.name)
       
-      return `${cleanShowName}_${nameWithoutExt}${ext}`
+      // Use show's file naming rules if available
+      if (show.fileNamingRules?.outputPattern) {
+        let outputName = show.fileNamingRules.outputPattern
+        
+        // Replace basic placeholders
+        outputName = outputName.replace(/{showName}/gi, show.name)
+        outputName = outputName.replace(/{originalFilename}/gi, nameWithoutExt)
+        
+        // Add current date placeholders
+        const now = new Date()
+        outputName = outputName.replace(/{YYYY}/gi, now.getFullYear().toString())
+        outputName = outputName.replace(/{MM}/gi, (now.getMonth() + 1).toString().padStart(2, '0'))
+        outputName = outputName.replace(/{DD}/gi, now.getDate().toString().padStart(2, '0'))
+        
+        // Clean up any remaining placeholders
+        outputName = outputName.replace(/{[^}]+}/g, '')
+        
+        // Sanitize the filename
+        outputName = this.sanitizeFilename(outputName)
+        
+        return `${outputName}${ext}`
+      }
+      
+      // Fallback: Just use sanitized show name (as requested)
+      const cleanShowName = this.sanitizeFilename(show.name)
+      return `${cleanShowName}${ext}`
+      
     } catch (error) {
       logger.warn(`Error generating output filename, using original: ${originalFilename}`)
       return originalFilename

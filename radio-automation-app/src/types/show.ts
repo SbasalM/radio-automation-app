@@ -1,8 +1,9 @@
 export interface FilePattern {
   id: string
-  pattern: string
+  pattern: string // Smart pattern that supports both wildcards (*) and extraction placeholders ({YYYY}, {DOTW})
   type: 'ftp' | 'watch'
   ftpProfileId?: string
+  watchPath?: string // Folder path to watch (for 'watch' type) - falls back to global setting if not specified
 }
 
 export interface MetadataExtractionRule {

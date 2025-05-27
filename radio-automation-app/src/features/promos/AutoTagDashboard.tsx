@@ -46,6 +46,11 @@ export function AutoTagDashboard() {
     const now = new Date()
     const jobs: AutoTagJob[] = []
 
+    // If no shows exist, return empty array
+    if (!shows || shows.length === 0) {
+      return []
+    }
+
     // Generate jobs for the selected time range
     const daysBack = timeRange === 'today' ? 1 : timeRange === 'week' ? 7 : 30
     
@@ -53,6 +58,9 @@ export function AutoTagDashboard() {
       const hoursBack = Math.random() * (daysBack * 24)
       const analyzedAt = new Date(now.getTime() - hoursBack * 60 * 60 * 1000)
       const show = shows[Math.floor(Math.random() * shows.length)]
+      
+      // Safety check for show
+      if (!show) continue
       
       jobs.push({
         id: `job-${i}`,
@@ -111,7 +119,7 @@ export function AutoTagDashboard() {
   })
 
   // Most used promos (mock data)
-  const promoUsageStats: PromoUsageStats[] = promos.slice(0, 5).map((promo, index) => ({
+  const promoUsageStats: PromoUsageStats[] = (promos || []).slice(0, 5).map((promo, index) => ({
     promoName: promo.name,
     usageCount: Math.floor(Math.random() * 20) + 5,
     lastUsed: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
@@ -146,6 +154,37 @@ export function AutoTagDashboard() {
     if (confidence >= 80) return 'text-blue-600 dark:text-blue-400'
     if (confidence >= 70) return 'text-yellow-600 dark:text-yellow-400'
     return 'text-red-600 dark:text-red-400'
+  }
+
+  const shows = getAllShows()
+  
+  // Show message if no shows are configured
+  if (!shows || shows.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Auto-Tag Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Monitor automatic promo tagging performance and statistics
+          </p>
+        </div>
+        
+        <Card>
+          <CardContent className="text-center py-12">
+            <BarChart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              No Show Profiles Available
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Create show profiles first to see auto-tagging statistics and performance data.
+            </p>
+            <Button onClick={() => window.location.href = '/shows'}>
+              Go to Show Profiles
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

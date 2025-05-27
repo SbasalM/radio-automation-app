@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Settings, FileText, Music, Tags, Speaker } from 'lucide-react'
+import { X, Settings, FileText, Music, Tags, Speaker, Folder } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { FilePatternInput } from './FilePatternInput'
@@ -19,7 +19,7 @@ interface ShowFormModalProps {
 
 type TabType = 'general' | 'patterns' | 'metadata' | 'audio' | 'promo'
 type AudioSubSection = 'general' | 'quality' | 'effects' | 'advanced' | 'trim' | 'processing'
-type MetadataSubSection = 'extraction' | 'fields' | 'naming' | 'preview'
+
 
 // Default values to ensure all required fields are present
 const DEFAULT_AUDIO_SETTINGS: AdvancedAudioSettings = {
@@ -69,7 +69,7 @@ const DEFAULT_METADATA_MAPPING: MetadataMapping = {
 }
 
 const DEFAULT_FILE_NAMING_RULES: FileNamingRules = {
-  outputPattern: '{showName}_{YYYY}-{MM}-{DD}',
+  outputPattern: '{showName}',
   dateFormat: 'YYYY-MM-DD',
   caseConversion: 'none',
   invalidCharacterHandling: 'underscore'
@@ -79,7 +79,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
   const { addShow, updateShow } = useShowStore()
   const [activeTab, setActiveTab] = useState<TabType>('general')
   const [audioSubSection, setAudioSubSection] = useState<AudioSubSection>('general')
-  const [metadataSubSection, setMetadataSubSection] = useState<MetadataSubSection>('extraction')
+
   const [sampleAudioFile, setSampleAudioFile] = useState<AudioFile | null>(null)
   
   const [formData, setFormData] = useState<{
@@ -143,23 +143,28 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
         name: editingShow.name,
         description: editingShow.description || '',
         enabled: editingShow.enabled,
-        filePatterns: editingShow.filePatterns,
-        outputDirectory: editingShow.outputDirectory,
+        filePatterns: editingShow.filePatterns || [{ id: Date.now().toString(), pattern: '', type: 'watch' }],
+        outputDirectory: editingShow.outputDirectory || '',
         metadataMapping: editingShow.metadataMapping || DEFAULT_METADATA_MAPPING,
         fileNamingRules: editingShow.fileNamingRules || DEFAULT_FILE_NAMING_RULES,
-        trimSettings: editingShow.trimSettings,
-        processingOptions: editingShow.processingOptions,
-        autoProcessing: editingShow.autoProcessing,
-        processOnSchedule: editingShow.processOnSchedule,
-        schedulePattern: editingShow.schedulePattern,
-        enableNotifications: editingShow.enableNotifications,
-        notificationEmails: editingShow.notificationEmails,
-        alertOnErrors: editingShow.alertOnErrors,
-        alertOnMissingFiles: editingShow.alertOnMissingFiles,
-        totalFilesProcessed: editingShow.totalFilesProcessed,
+        trimSettings: editingShow.trimSettings || {
+          startSeconds: 0,
+          endSeconds: 0,
+          fadeIn: false,
+          fadeOut: false
+        },
+        processingOptions: editingShow.processingOptions || DEFAULT_PROCESSING_OPTIONS,
+        autoProcessing: editingShow.autoProcessing ?? true,
+        processOnSchedule: editingShow.processOnSchedule ?? false,
+        schedulePattern: editingShow.schedulePattern || '',
+        enableNotifications: editingShow.enableNotifications ?? false,
+        notificationEmails: editingShow.notificationEmails || [],
+        alertOnErrors: editingShow.alertOnErrors ?? true,
+        alertOnMissingFiles: editingShow.alertOnMissingFiles ?? false,
+        totalFilesProcessed: editingShow.totalFilesProcessed ?? 0,
         lastProcessedAt: editingShow.lastProcessedAt,
-        averageProcessingTime: editingShow.averageProcessingTime,
-        errorCount: editingShow.errorCount
+        averageProcessingTime: editingShow.averageProcessingTime ?? 0,
+        errorCount: editingShow.errorCount ?? 0
       })
     } else {
       // Reset form for new show
@@ -180,6 +185,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
         processingOptions: DEFAULT_PROCESSING_OPTIONS,
         autoProcessing: true,
         processOnSchedule: false,
+        schedulePattern: '',
         enableNotifications: false,
         notificationEmails: [],
         alertOnErrors: true,
@@ -200,9 +206,8 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
       newErrors.name = 'Show name is required'
     }
 
-    if (!formData.outputDirectory.trim()) {
-      newErrors.outputDirectory = 'Output directory is required'
-    }
+    // Output directory is optional - will use global default if empty
+    // No validation needed for outputDirectory
 
     const hasValidPattern = formData.filePatterns.some(p => p.pattern.trim())
     if (!hasValidPattern) {
@@ -213,7 +218,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!validateForm()) {
@@ -221,18 +226,39 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
       return
     }
 
-    const showData = {
-      ...formData,
-      filePatterns: formData.filePatterns.filter(p => p.pattern.trim())
-    }
+    try {
+      // Include all form data, not just a subset
+      const showData = {
+        name: formData.name,
+        description: formData.description,
+        enabled: formData.enabled,
+        filePatterns: formData.filePatterns.filter(p => p.pattern.trim()),
+        outputDirectory: formData.outputDirectory, // Optional - backend will use global default if empty
+        autoProcessing: formData.autoProcessing,
+        // Include metadata and other settings
+        metadataMapping: formData.metadataMapping,
+        fileNamingRules: formData.fileNamingRules,
+        trimSettings: formData.trimSettings,
+        processingOptions: formData.processingOptions,
+        processOnSchedule: formData.processOnSchedule,
+        schedulePattern: formData.schedulePattern,
+        enableNotifications: formData.enableNotifications,
+        notificationEmails: formData.notificationEmails,
+        alertOnErrors: formData.alertOnErrors,
+        alertOnMissingFiles: formData.alertOnMissingFiles
+      }
 
-    if (editingShow) {
-      updateShow(editingShow.id, showData)
-    } else {
-      addShow(showData)
-    }
+      if (editingShow) {
+        await updateShow(editingShow.id, showData)
+      } else {
+        await addShow(showData)
+      }
 
-    onClose()
+      onClose()
+    } catch (error) {
+      console.error('Failed to save show:', error)
+      alert('Failed to save show. Please try again.')
+    }
   }
 
   // Load sample file for trim editor
@@ -270,6 +296,55 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
       }
     }))
     setSampleAudioFile(null)
+  }
+
+  // Handle directory selection
+  const handleSelectDirectory = async () => {
+    try {
+      // Check if the File System Access API is supported (Chrome, Edge, Opera)
+      if ('showDirectoryPicker' in window) {
+        const dirHandle = await (window as any).showDirectoryPicker()
+        
+        // Try to get a more complete path, but File System Access API
+        // doesn't provide full absolute paths for security reasons
+        let selectedPath = dirHandle.name
+        
+        // For better UX, show the directory name but inform user they can edit
+        setFormData({ ...formData, outputDirectory: selectedPath })
+        
+        // Show a helpful message
+        console.log('Selected directory:', dirHandle.name, '- You can edit this to specify the full path')
+      } else {
+        // Fallback: Create a hidden file input for directory selection
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.webkitdirectory = true
+        input.style.display = 'none'
+        
+        input.onchange = (e) => {
+          const files = (e.target as HTMLInputElement).files
+          if (files && files.length > 0) {
+            // Extract the directory path from the first file
+            const firstFile = files[0]
+            const pathParts = firstFile.webkitRelativePath.split('/')
+            if (pathParts.length > 1) {
+              // Use the parent directory name or full path
+              const directoryPath = pathParts.slice(0, -1).join('/')
+              setFormData({ ...formData, outputDirectory: directoryPath })
+            } else {
+              // Use just the directory name if no subdirectory
+              setFormData({ ...formData, outputDirectory: pathParts[0] })
+            }
+          }
+          document.body.removeChild(input)
+        }
+        
+        document.body.appendChild(input)
+        input.click()
+      }
+    } catch (error) {
+      console.log('Directory selection was cancelled or failed:', error)
+    }
   }
 
   const tabs = [
@@ -333,11 +408,13 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
               <div className="space-y-6">
                 {/* Show Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="show-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Show Name *
                   </label>
                   <input
                     type="text"
+                    id="show-name"
+                    name="showName"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -348,10 +425,12 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
 
                 {/* Description */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="show-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Description
                   </label>
                   <textarea
+                    id="show-description"
+                    name="showDescription"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows={3}
@@ -362,17 +441,36 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
 
                 {/* Output Directory */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Output Directory *
+                  <label htmlFor="output-directory" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Output Directory
                   </label>
-                  <input
-                    type="text"
-                    value={formData.outputDirectory}
-                    onChange={(e) => setFormData({ ...formData, outputDirectory: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., /processed/morning-show"
-                  />
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      id="output-directory"
+                      name="outputDirectory"
+                      value={formData.outputDirectory}
+                      onChange={(e) => setFormData({ ...formData, outputDirectory: e.target.value })}
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., C:\Radio\Processed\MyShow or leave blank for global setting"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSelectDirectory}
+                      className="px-3 py-2 h-10 flex items-center space-x-2"
+                      title="Browse for directory"
+                    >
+                      <Folder className="h-4 w-4" />
+                      <span className="hidden sm:inline">Browse</span>
+                    </Button>
+                  </div>
                   {errors.outputDirectory && <p className="text-red-500 text-sm mt-1">{errors.outputDirectory}</p>}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <strong>Optional:</strong> If not specified, the global output directory setting will be used. <br />
+                    <strong>Note:</strong> The Browse button may only show the folder name for security reasons. You can manually enter the full path.
+                  </p>
                 </div>
 
                 {/* Trim Settings */}
@@ -489,47 +587,22 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
                 <FilePatternInput
                   patterns={formData.filePatterns}
                   onChange={(patterns) => setFormData({ ...formData, filePatterns: patterns })}
+                  fileNamingRules={formData.fileNamingRules}
                 />
                 {errors.filePatterns && <p className="text-red-500 text-sm mt-1">{errors.filePatterns}</p>}
               </div>
             )}
 
             {activeTab === 'metadata' && (
-              <div className="space-y-4">
-                {/* Sub-navigation for Metadata */}
-                <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
-                  {[
-                    { id: 'extraction', label: 'Extraction Rules' },
-                    { id: 'fields', label: 'Metadata Fields' },
-                    { id: 'naming', label: 'File Naming' },
-                    { id: 'preview', label: 'Test & Preview' }
-                  ].map(({ id, label }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setMetadataSubSection(id as MetadataSubSection)}
-                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        metadataSubSection === id
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Metadata Section Content */}
-                <div>
-                  <ErrorBoundary>
-                    <MetadataConfig
-                      metadataMapping={formData.metadataMapping}
-                      fileNamingRules={formData.fileNamingRules}
-                      onUpdateMapping={(metadataMapping: MetadataMapping) => setFormData({ ...formData, metadataMapping })}
-                      onUpdateNamingRules={(fileNamingRules: FileNamingRules) => setFormData({ ...formData, fileNamingRules })}
-                    />
-                  </ErrorBoundary>
-                </div>
+              <div>
+                <ErrorBoundary>
+                  <MetadataConfig
+                    metadataMapping={formData.metadataMapping}
+                    fileNamingRules={formData.fileNamingRules}
+                    onUpdateMapping={(metadataMapping: MetadataMapping) => setFormData({ ...formData, metadataMapping })}
+                    onUpdateNamingRules={(fileNamingRules: FileNamingRules) => setFormData({ ...formData, fileNamingRules })}
+                  />
+                </ErrorBoundary>
               </div>
             )}
 

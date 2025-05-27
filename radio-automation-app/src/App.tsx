@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -11,8 +12,13 @@ import { AutoTagging } from '@/features/promos/AutoTagging'
 import { AutoTagDashboard } from '@/features/promos/AutoTagDashboard'
 import { FTPSettings } from '@/features/ftp/FTPSettings'
 import { Settings } from '@/features/settings/Settings'
+import { migrateLocalStorage } from '@/utils/storage-migration'
 
 function App() {
+  // Run migration on app startup
+  useEffect(() => {
+    migrateLocalStorage()
+  }, [])
   return (
     <BrowserRouter>
       <Layout>

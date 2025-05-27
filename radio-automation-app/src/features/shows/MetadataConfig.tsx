@@ -1,56 +1,19 @@
 import { useState } from 'react'
-import { Plus, Trash2, FileText, Tag, Settings2, Copy, BookOpen } from 'lucide-react'
+import { Tag, Settings2, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { PatternTester } from '@/components/shows/PatternTester'
-import type { MetadataMapping, MetadataExtractionRule, FileNamingRules, ShowTemplate } from '@/types/show'
-import { BUILT_IN_TEMPLATES } from '@/types/show'
+import type { MetadataMapping, FileNamingRules } from '@/types/show'
 
 interface MetadataConfigProps {
   metadataMapping: MetadataMapping
   fileNamingRules: FileNamingRules
   onUpdateMapping: (mapping: MetadataMapping) => void
   onUpdateNamingRules: (rules: FileNamingRules) => void
-  activeSection?: 'extraction' | 'fields' | 'naming' | 'preview'
 }
-
-// Common regex patterns for quick selection
-const COMMON_PATTERNS = [
-  { 
-    name: 'Date with underscores (YYYYMMDD)',
-    pattern: '(\\d{8})',
-    description: 'Matches dates like 20241215'
-  },
-  {
-    name: 'Date with hyphens (YYYY-MM-DD)',
-    pattern: '(\\d{4}-\\d{2}-\\d{2})',
-    description: 'Matches dates like 2024-12-15'
-  },
-  {
-    name: 'Show name (word characters)',
-    pattern: '([A-Za-z]+)',
-    description: 'Matches alphabetic characters'
-  },
-  {
-    name: 'Episode/Segment number',
-    pattern: '(\\d+)',
-    description: 'Matches numbers'
-  },
-  {
-    name: 'Generic text segment',
-    pattern: '([^._-]+)',
-    description: 'Matches text until delimiter'
-  },
-  {
-    name: 'File extension',
-    pattern: '\\.(mp3|wav|flac|aac)',
-    description: 'Matches audio file extensions'
-  }
-]
 
 // Metadata field suggestions
 const METADATA_FIELDS = [
-  { key: 'title', label: 'Title', placeholder: '{showName} - {segment}' },
+  { key: 'title', label: 'Title', placeholder: '{showName} - {date}' },
   { key: 'artist', label: 'Artist', placeholder: 'Station Name' },
   { key: 'album', label: 'Album', placeholder: '{showName} {YYYY}' },
   { key: 'year', label: 'Year', placeholder: '{YYYY}' },
@@ -62,15 +25,13 @@ export function MetadataConfig({
   metadataMapping, 
   fileNamingRules, 
   onUpdateMapping, 
-  onUpdateNamingRules, 
-  activeSection 
+  onUpdateNamingRules
 }: MetadataConfigProps) {
-  const [activeTab, setActiveTab] = useState<'patterns' | 'extraction' | 'metadata' | 'naming' | 'test'>('patterns')
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
+  const [activeTab, setActiveTab] = useState<'metadata' | 'naming'>('metadata')
 
   // Provide default values if props are undefined
   const safeMetadataMapping: MetadataMapping = metadataMapping || {
-    inputPatterns: [''],
+    inputPatterns: [],
     extractionRules: [],
     outputMetadata: {
       title: '',
@@ -86,62 +47,6 @@ export function MetadataConfig({
     dateFormat: 'YYYY-MM-DD',
     caseConversion: 'none',
     invalidCharacterHandling: 'underscore'
-  }
-
-  // Pattern management
-  const addInputPattern = () => {
-    const newMapping = {
-      ...safeMetadataMapping,
-      inputPatterns: [...safeMetadataMapping.inputPatterns, '']
-    }
-    onUpdateMapping(newMapping)
-  }
-
-  const updateInputPattern = (index: number, pattern: string) => {
-    const newPatterns = [...safeMetadataMapping.inputPatterns]
-    newPatterns[index] = pattern
-    onUpdateMapping({
-      ...safeMetadataMapping,
-      inputPatterns: newPatterns
-    })
-  }
-
-  const removeInputPattern = (index: number) => {
-    const newPatterns = safeMetadataMapping.inputPatterns.filter((_, i) => i !== index)
-    onUpdateMapping({
-      ...safeMetadataMapping,
-      inputPatterns: newPatterns
-    })
-  }
-
-  // Extraction rules management
-  const addExtractionRule = () => {
-    const newRule: MetadataExtractionRule = {
-      field: 'showName',
-      source: 'regex',
-      regexGroup: 1
-    }
-    onUpdateMapping({
-      ...safeMetadataMapping,
-      extractionRules: [...safeMetadataMapping.extractionRules, newRule]
-    })
-  }
-
-  const updateExtractionRule = (index: number, rule: MetadataExtractionRule) => {
-    const newRules = [...safeMetadataMapping.extractionRules]
-    newRules[index] = rule
-    onUpdateMapping({
-      ...safeMetadataMapping,
-      extractionRules: newRules
-    })
-  }
-
-  const removeExtractionRule = (index: number) => {
-    const newRules = safeMetadataMapping.extractionRules.filter((_, i) => i !== index)
-    onUpdateMapping({
-      ...safeMetadataMapping,
-      extractionRules: newRules
-    })
   }
 
   // Metadata management
@@ -163,308 +68,79 @@ export function MetadataConfig({
     })
   }
 
-  // Template loading
-  const loadTemplate = (templateId: string) => {
-    const template = BUILT_IN_TEMPLATES.find(t => t.id === templateId)
-    if (template) {
-      onUpdateMapping(template.metadataMapping)
-      onUpdateNamingRules(template.fileNamingRules)
-      setSelectedTemplate(templateId)
-    }
-  }
-
-  const insertCommonPattern = (pattern: string, patternIndex: number) => {
-    const currentPattern = safeMetadataMapping.inputPatterns[patternIndex] || ''
-    const newPattern = currentPattern + pattern
-    updateInputPattern(patternIndex, newPattern)
-  }
-
-  // Handle tab changes safely
-  const handleTabChange = (tabId: string) => {
-    const validTabs = ['patterns', 'extraction', 'metadata', 'naming', 'test']
-    if (validTabs.includes(tabId)) {
-      setActiveTab(tabId as any)
-    }
-  }
-
   return (
     <div className="space-y-6">
-      {/* Template Selection */}
+      {/* Info Card */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <BookOpen className="h-5 w-5" />
-            <span>Templates</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Load from template
-              </label>
-              <select
-                value={selectedTemplate}
-                onChange={(e) => setSelectedTemplate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select a template...</option>
-                {BUILT_IN_TEMPLATES.map(template => (
-                  <option key={template.id} value={template.id}>
-                    {template.name} - {template.description}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <Button
-                onClick={() => selectedTemplate && loadTemplate(selectedTemplate)}
-                disabled={!selectedTemplate}
-                className="w-full"
-                type="button"
-              >
-                Load Template
-              </Button>
-            </div>
+        <CardContent className="pt-6">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+              How File Processing Works:
+            </h4>
+            <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+              <li>• <strong>File Patterns</strong> identify which files to process (set in the Patterns tab)</li>
+              <li>• <strong>Metadata Fields</strong> set the ID3 tags for processed audio files</li>
+              <li>• <strong>File Naming</strong> determines the output filename structure</li>
+            </ul>
           </div>
         </CardContent>
       </Card>
 
-      {/* Navigation Tabs */}
+      {/* Tab Navigation */}
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: 'patterns', label: 'Input Patterns', icon: FileText },
-              { id: 'extraction', label: 'Extraction Rules', icon: Settings2 },
-              { id: 'metadata', label: 'Metadata Fields', icon: Tag },
-              { id: 'naming', label: 'File Naming', icon: Copy },
-              { id: 'test', label: 'Test & Preview', icon: BookOpen }
-            ].map(({ id, label, icon: Icon }) => (
-              <Button
-                key={id}
-                variant={activeTab === id ? 'default' : 'outline'}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  handleTabChange(id)
-                }}
-                className="flex items-center space-x-2"
+          <div className="flex items-center space-x-4">
+            <CardTitle className="flex items-center space-x-2">
+              <Tag className="h-5 w-5" />
+              <span>Metadata & Naming</span>
+            </CardTitle>
+            <div className="flex gap-2">
+              <button
                 type="button"
+                onClick={() => setActiveTab('metadata')}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 'metadata'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'
+                }`}
               >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </Button>
-            ))}
+                Metadata Fields
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('naming')}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 'naming'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'
+                }`}
+              >
+                File Naming
+              </button>
+            </div>
           </div>
         </CardHeader>
 
         <CardContent>
-          {/* Input Patterns Tab */}
-          {activeTab === 'patterns' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">Input Patterns</h3>
-                <Button onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  addInputPattern()
-                }} size="sm" type="button">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Pattern
-                </Button>
-              </div>
-
-              {safeMetadataMapping.inputPatterns.map((pattern, index) => (
-                <div key={index} className="space-y-3 p-4 border rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Pattern {index + 1}
-                    </label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        removeInputPattern(index)
-                      }}
-                      className="text-red-600 hover:text-red-700"
-                      type="button"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <input
-                    type="text"
-                    value={pattern}
-                    onChange={(e) => updateInputPattern(index, e.target.value)}
-                    placeholder="Enter regex pattern..."
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  />
-
-                  {/* Common Pattern Helpers */}
-                  <div>
-                    <label className="text-xs text-gray-500 dark:text-gray-400 mb-2 block">
-                      Common patterns:
-                    </label>
-                    <div className="flex flex-wrap gap-1">
-                      {COMMON_PATTERNS.map((commonPattern) => (
-                        <Button
-                          key={commonPattern.name}
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            insertCommonPattern(commonPattern.pattern, index)
-                          }}
-                          className="text-xs"
-                          title={commonPattern.description}
-                          type="button"
-                        >
-                          {commonPattern.name}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {safeMetadataMapping.inputPatterns.length === 0 && (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No input patterns defined. Add a pattern to get started.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Extraction Rules Tab */}
-          {activeTab === 'extraction' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">Extraction Rules</h3>
-                <Button onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  addExtractionRule()
-                }} size="sm" type="button">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Rule
-                </Button>
-              </div>
-
-              {safeMetadataMapping.extractionRules.map((rule, index) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Field
-                    </label>
-                    <select
-                      value={rule.field}
-                      onChange={(e) => updateExtractionRule(index, { 
-                        ...rule, 
-                        field: e.target.value as MetadataExtractionRule['field'] 
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="showName">Show Name</option>
-                      <option value="date">Date</option>
-                      <option value="episode">Episode</option>
-                      <option value="segment">Segment</option>
-                      <option value="reporter">Reporter</option>
-                      <option value="storyId">Story ID</option>
-                      <option value="custom">Custom</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Source
-                    </label>
-                    <select
-                      value={rule.source}
-                      onChange={(e) => updateExtractionRule(index, { 
-                        ...rule, 
-                        source: e.target.value as MetadataExtractionRule['source'] 
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="regex">Regex Group</option>
-                      <option value="filename">Full Filename</option>
-                      <option value="directory">Directory</option>
-                      <option value="static">Static Value</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {rule.source === 'regex' ? 'Group #' : rule.source === 'static' ? 'Value' : 'Config'}
-                    </label>
-                    {rule.source === 'regex' ? (
-                      <input
-                        type="number"
-                        value={rule.regexGroup || 1}
-                        onChange={(e) => updateExtractionRule(index, { 
-                          ...rule, 
-                          regexGroup: parseInt(e.target.value) || 1 
-                        })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min="1"
-                      />
-                    ) : rule.source === 'static' ? (
-                      <input
-                        type="text"
-                        value={rule.staticValue || ''}
-                        onChange={(e) => updateExtractionRule(index, { 
-                          ...rule, 
-                          staticValue: e.target.value 
-                        })}
-                        placeholder="Static value..."
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="Config..."
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled
-                      />
-                    )}
-                  </div>
-
-                  <div className="flex items-end">
-                    <Button
-                      variant="outline"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        removeExtractionRule(index)
-                      }}
-                      className="w-full text-red-600 hover:text-red-700"
-                      type="button"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-
-              {safeMetadataMapping.extractionRules.length === 0 && (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <Settings2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No extraction rules defined. Add rules to extract data from filenames.</p>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Metadata Fields Tab */}
           {activeTab === 'metadata' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Output Metadata</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">ID3 Metadata Tags</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    METADATA_FIELDS.forEach(field => {
+                      updateMetadataField(field.key, field.placeholder)
+                    })
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Use Defaults
+                </Button>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {METADATA_FIELDS.map(({ key, label, placeholder }) => (
@@ -480,10 +156,51 @@ export function MetadataConfig({
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Use placeholders like {'{showName}, {date}, {segment}, {YYYY}, {MM}, {DD}'}
+                      Use placeholders like {'{showName}, {date}, {YYYY}, {MM}, {DD}'}
                     </p>
                   </div>
                 ))}
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                  Available Placeholders:
+                </h4>
+                <div className="space-y-2">
+                  <div>
+                    <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">From File Pattern Extraction:</h5>
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2 text-xs font-mono">
+                      <span className="text-blue-600 dark:text-blue-400">{'{YYYY}'}</span>
+                      <span className="text-blue-600 dark:text-blue-400">{'{YY}'}</span>
+                      <span className="text-blue-600 dark:text-blue-400">{'{MM}'}</span>
+                      <span className="text-blue-600 dark:text-blue-400">{'{DD}'}</span>
+                      <span className="text-blue-600 dark:text-blue-400">{'{DOTW}'}</span>
+                      <span className="text-blue-600 dark:text-blue-400">{'{SHOW}'}</span>
+                      <span className="text-blue-600 dark:text-blue-400">{'{EPISODE}'}</span>
+                      <span className="text-blue-600 dark:text-blue-400">{'{SEGMENT}'}</span>
+                      <span className="text-blue-600 dark:text-blue-400">{'{TIME}'}</span>
+                      <span className="text-blue-600 dark:text-blue-400">{'{ANY}'}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Built-in Placeholders:</h5>
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2 text-xs font-mono">
+                      <span className="text-gray-600 dark:text-gray-400">{'{showName}'}</span>
+                      <span className="text-gray-600 dark:text-gray-400">{'{date}'}</span>
+                      <span className="text-gray-600 dark:text-gray-400">{'{timestamp}'}</span>
+                      <span className="text-gray-600 dark:text-gray-400">{'{HH}'}</span>
+                      <span className="text-gray-600 dark:text-gray-400">{'{mm}'}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Date Combinations:</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs font-mono">
+                      <span className="text-green-600 dark:text-green-400">{'{YYYY-MM-DD}'}</span>
+                      <span className="text-green-600 dark:text-green-400">{'{YYYYMMDD}'}</span>
+                      <span className="text-green-600 dark:text-green-400">{'{MM-DD-YYYY}'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -491,7 +208,7 @@ export function MetadataConfig({
           {/* File Naming Tab */}
           {activeTab === 'naming' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">File Naming Rules</h3>
+              <h3 className="text-lg font-medium">Output File Naming</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -502,9 +219,12 @@ export function MetadataConfig({
                     type="text"
                     value={safeFileNamingRules.outputPattern}
                     onChange={(e) => updateFileNamingRule('outputPattern', e.target.value)}
-                    placeholder="{ShowName}_{YYYY}-{MM}-{DD}"
+                    placeholder="{showName}_{YYYY}-{MM}-{DD}"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    File extension will be added automatically
+                  </p>
                 </div>
 
                 <div>
@@ -554,16 +274,64 @@ export function MetadataConfig({
                   />
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Test & Preview Tab */}
-          {activeTab === 'test' && (
-            <PatternTester
-              metadataMapping={safeMetadataMapping}
-              fileNamingRules={safeFileNamingRules}
-              onUpdateMapping={onUpdateMapping}
-            />
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Preview Examples:
+                </h4>
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Pattern:</span>
+                    <p className="text-sm font-mono text-gray-600 dark:text-gray-400">
+                      {safeFileNamingRules.outputPattern || '{SHOW}_{YYYY}-{MM}-{DD}'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Sample outputs:</span>
+                    <div className="space-y-1 text-sm font-mono">
+                      <p className="text-gray-600 dark:text-gray-400">
+                        • {(safeFileNamingRules.outputPattern || '{SHOW}_{YYYY}-{MM}-{DD}')
+                          .replace('{SHOW}', 'MorningShow')
+                          .replace('{showName}', 'Morning Show')
+                          .replace('{YYYY}', '2024')
+                          .replace('{YY}', '24')
+                          .replace('{MM}', '12')
+                          .replace('{DD}', '15')
+                          .replace('{DOTW}', 'Monday')
+                          .replace('{EPISODE}', 'E001')
+                          .replace('{SEGMENT}', 'Weather')
+                          .replace('{TIME}', '08:30')
+                          .replace('{date}', '2024-12-15')
+                          .replace('{HH}', '09')
+                          .replace('{mm}', '30')
+                          .replace('{YYYY-MM-DD}', '2024-12-15')
+                          .replace('{YYYYMMDD}', '20241215')
+                        }.mp3
+                      </p>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        • {(safeFileNamingRules.outputPattern || '{SHOW}_{YYYY}-{MM}-{DD}')
+                          .replace('{SHOW}', 'cal')
+                          .replace('{showName}', 'Calendar Show')
+                          .replace('{YYYY}', '2024')
+                          .replace('{YY}', '24')
+                          .replace('{MM}', '01')
+                          .replace('{DD}', '08')
+                          .replace('{DOTW}', 'Tuesday')
+                          .replace('{EPISODE}', 'E002')
+                          .replace('{SEGMENT}', 'News')
+                          .replace('{TIME}', '14:45')
+                          .replace('{date}', '2024-01-08')
+                          .replace('{HH}', '14')
+                          .replace('{mm}', '45')
+                          .replace('{YYYY-MM-DD}', '2024-01-08')
+                          .replace('{YYYYMMDD}', '20240108')
+                        }.mp3
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express'
+import path from 'path'
 import { createLogger } from '../utils/logger'
 import { asyncHandler, validationError } from '../utils/errorHandler'
 import { StorageService } from '../services/storage'
@@ -54,27 +55,42 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     throw validationError('Show name is required')
   }
   
-  if (!showData.outputDirectory) {
-    throw validationError('Output directory is required')
-  }
-  
   if (!showData.filePatterns || !Array.isArray(showData.filePatterns)) {
     throw validationError('File patterns are required')
   }
 
-  // Set defaults
+  // Get global settings for defaults
+  const settings = await storage.getSettings()
+  const globalOutputDir = settings.globalOutputDirectory || path.join(process.cwd(), 'output')
+  
+  // Use provided output directory or fall back to global default
+  const outputDirectory = showData.outputDirectory?.trim() || globalOutputDir
+
+  // Set defaults and include all show data
   const newShowData = {
     name: showData.name,
     description: showData.description || '',
     enabled: showData.enabled !== undefined ? showData.enabled : true,
     filePatterns: showData.filePatterns.map((pattern: any, index: number) => ({
-      id: `pattern_${index}`,
+      id: pattern.id || `pattern_${index}`,
       pattern: pattern.pattern,
       type: pattern.type || 'watch',
-      ftpProfileId: pattern.ftpProfileId
+      ftpProfileId: pattern.ftpProfileId,
+      watchPath: pattern.watchPath
     })),
-    outputDirectory: showData.outputDirectory,
-    autoProcessing: showData.autoProcessing !== undefined ? showData.autoProcessing : true
+    outputDirectory,
+    autoProcessing: showData.autoProcessing !== undefined ? showData.autoProcessing : true,
+    // Include metadata and other settings if provided
+    metadataMapping: showData.metadataMapping,
+    fileNamingRules: showData.fileNamingRules,
+    trimSettings: showData.trimSettings,
+    processingOptions: showData.processingOptions,
+    processOnSchedule: showData.processOnSchedule,
+    schedulePattern: showData.schedulePattern,
+    enableNotifications: showData.enableNotifications,
+    notificationEmails: showData.notificationEmails,
+    alertOnErrors: showData.alertOnErrors,
+    alertOnMissingFiles: showData.alertOnMissingFiles
   }
   
   const createdShow = await storage.createShow(newShowData)
@@ -113,7 +129,8 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       id: pattern.id || `pattern_${index}`,
       pattern: pattern.pattern,
       type: pattern.type || 'watch',
-      ftpProfileId: pattern.ftpProfileId
+      ftpProfileId: pattern.ftpProfileId,
+      watchPath: pattern.watchPath
     }))
   }
   

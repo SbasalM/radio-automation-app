@@ -107,21 +107,39 @@ export class FileWatcherService {
         await this.state.watchers.get(showId)?.close()
       }
 
-      // Get watch patterns from show
-      const watchPatterns = show.filePatterns
-        .filter(pattern => pattern.type === 'watch')
-        .map(pattern => pattern.pattern)
+      // Get watch patterns and directories
+      const watchPatterns = show.filePatterns.filter(pattern => pattern.type === 'watch')
 
       if (watchPatterns.length === 0) {
         logger.warn(`No watch patterns found for show: ${show.name}`)
         return
       }
 
+      // Get watch directories (per-pattern or global fallback)
+      const settings = await this.storageService.getSettings()
+      const globalWatchDir = settings.globalWatchDirectory || path.join(process.cwd(), 'watch')
+      
+      // Collect unique watch directories
+      const watchDirectories = new Set<string>()
+      
+      for (const pattern of watchPatterns) {
+        const watchDir = pattern.watchPath || globalWatchDir
+        watchDirectories.add(watchDir)
+        
+        // Ensure watch directory exists
+        try {
+          await fs.ensureDir(watchDir)
+          logger.info(`Ensured watch directory exists: ${watchDir}`)
+        } catch (error) {
+          logger.error(`Failed to create watch directory ${watchDir}:`, error)
+        }
+      }
+
       // Ensure output directory exists
       await fs.ensureDir(show.outputDirectory)
 
-      // Create watcher
-      const watcher = chokidar.watch(watchPatterns, {
+      // Create watcher for directories (not patterns!)
+      const watcher = chokidar.watch(Array.from(watchDirectories), {
         ignored: /(^|[\/\\])\../, // ignore dotfiles
         persistent: true,
         ignoreInitial: false, // Process existing files
@@ -147,7 +165,9 @@ export class FileWatcherService {
           logger.error(`Watcher error for show ${show.name}:`, error)
         })
         .on('ready', () => {
-          logger.info(`Started watching ${show.name}: ${watchPatterns.join(', ')}`)
+          const patternList = watchPatterns.map(p => p.pattern).join(', ')
+          const dirList = Array.from(watchDirectories).join(', ')
+          logger.info(`Started watching ${show.name}: patterns [${patternList}] in directories [${dirList}]`)
         })
 
       this.state.watchers.set(showId, watcher)
@@ -209,14 +229,37 @@ export class FileWatcherService {
 
   private matchesPattern(filename: string, pattern: string): boolean {
     try {
-      // Convert glob pattern to regex
-      const regexPattern = pattern
-        .replace(/\./g, '\\.')
-        .replace(/\*/g, '.*')
-        .replace(/\?/g, '.')
-      
+      // Convert sophisticated pattern to regex
+      // Handle placeholders FIRST, before escaping regex characters
+      let regexPattern = pattern
+        // Handle date/time placeholders
+        .replace(/\{YYYY\}/g, '\\d{4}')        // 4-digit year
+        .replace(/\{YY\}/g, '\\d{2}')          // 2-digit year
+        .replace(/\{MM\}/g, '\\d{1,2}')        // Month
+        .replace(/\{DD\}/g, '\\d{1,2}')        // Day
+        .replace(/\{HH\}/g, '\\d{1,2}')        // Hour
+        .replace(/\{mm\}/g, '\\d{1,2}')        // Minute
+        .replace(/\{ss\}/g, '\\d{1,2}')        // Second
+        .replace(/\{DOTW\}/g, '[A-Za-z]+')     // Day of the week
+        .replace(/\{DOW\}/g, '[A-Za-z]{3}')    // Day of week (3 letters)
+        .replace(/\{MONTH\}/g, '[A-Za-z]+')    // Month name
+        .replace(/\{MON\}/g, '[A-Za-z]{3}')    // Month (3 letters)
+        // Handle wildcard patterns
+        .replace(/\*/g, '.*')                  // * becomes .*
+        .replace(/\?/g, '.')                   // ? becomes .
+        // Escape remaining regex special characters (but NOT backslashes that are part of our regex)
+        .replace(/[.+^$|[\]]/g, '\\$&')
+        
       const regex = new RegExp(`^${regexPattern}$`, 'i')
-      return regex.test(filename)
+      const matches = regex.test(filename)
+      
+      if (matches) {
+        logger.debug(`File "${filename}" matches pattern "${pattern}"`)
+      } else {
+        logger.debug(`File "${filename}" does NOT match pattern "${pattern}" (regex: ${regexPattern})`)
+      }
+      
+      return matches
     } catch (error) {
       logger.error(`Invalid pattern ${pattern}:`, error)
       return false
