@@ -83,4 +83,36 @@ router.delete('/', asyncHandler(async (req: Request, res: Response) => {
   res.json(response)
 }))
 
+// POST /api/queue/process - Process all pending files
+router.post('/process', asyncHandler(async (req: Request, res: Response) => {
+  const fileWatcher = FileWatcherService.getInstance()
+  const queue = await storage.getQueue()
+  const pendingFiles = queue.filter(f => f.status === 'pending')
+  
+  logger.info(`Processing ${pendingFiles.length} pending files`)
+  
+  const results = []
+  for (const file of pendingFiles) {
+    try {
+      await fileWatcher.retryFile(file.id)
+      results.push({ id: file.id, filename: file.filename, status: 'processing' })
+    } catch (error) {
+      results.push({ 
+        id: file.id, 
+        filename: file.filename, 
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  }
+  
+  const response: ApiResponse = {
+    success: true,
+    message: `Started processing ${pendingFiles.length} files`,
+    data: results
+  }
+  
+  res.json(response)
+}))
+
 export default router 

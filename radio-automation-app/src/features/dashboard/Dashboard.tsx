@@ -11,7 +11,8 @@ import {
   Info,
   CheckCircle2,
   Server,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react'
 import { useShowStore } from '@/store/show-store'
 import { useFileQueueStore } from '@/store/file-queue-store'
@@ -34,6 +35,7 @@ export function Dashboard() {
   
   const [refreshKey, setRefreshKey] = useState(0)
   const [showErrorOptions, setShowErrorOptions] = useState(false)
+  const [systemStatus, setSystemStatus] = useState<any>(null)
 
   const handleClearData = () => {
     if (confirm('This will clear all local data and reload the page. Are you sure?')) {
@@ -42,10 +44,24 @@ export function Dashboard() {
     }
   }
 
+  // Load system status
+  const loadSystemStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/system/status')
+      if (response.ok) {
+        const data = await response.json()
+        setSystemStatus(data.data)
+      }
+    } catch (error) {
+      console.error('Failed to load system status:', error)
+    }
+  }
+
   // Load initial data
   useEffect(() => {
     loadShows()
     loadQueue()
+    loadSystemStatus()
   }, [])
 
   // Auto-refresh every 10 seconds
@@ -53,17 +69,37 @@ export function Dashboard() {
     const interval = setInterval(() => {
       setRefreshKey(prev => prev + 1)
       loadQueue() // Refresh queue data
+      loadSystemStatus() // Refresh system status
     }, 10000)
 
     return () => clearInterval(interval)
   }, [])
 
-  let activeShows, queuedFiles, processedToday
+  // Use reactive store values with proper dependencies
+  const files = getQueuedFiles()
+  const activeShows = getActiveShows()
+  
+  // Calculate metrics reactively - these need to be recalculated when files change
+  const queuedFiles = files.filter(f => f.status === FileStatus.PENDING || f.status === FileStatus.PROCESSING).length
+  const processedToday = files.filter(f => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return f.status === FileStatus.COMPLETED && 
+           f.processedAt && 
+           new Date(f.processedAt) >= today
+  }).length
+  
+  // Force re-calculation when data changes
+  useEffect(() => {
+    // This effect will trigger when store data changes
+    loadQueue() // Refresh queue data when files array changes
+  }, [files.length, refreshKey, loadQueue])
   
   try {
-    activeShows = getActiveShows()
-    queuedFiles = getFilesByStatus(FileStatus.PENDING).length + getFilesByStatus(FileStatus.PROCESSING).length
-    processedToday = getTodayCompletedCount()
+    // Validate data
+    if (!Array.isArray(files)) {
+      throw new Error('Invalid queue data')
+    }
   } catch (error) {
     console.error('Error loading dashboard data:', error)
     return (
@@ -99,7 +135,7 @@ export function Dashboard() {
   const nextScheduled = getNextScheduledDownload()
   
   // Get recent activity from the last 10 files
-  const recentFiles = getQueuedFiles()
+  const recentFiles = files
     .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
     .slice(0, 10)
 
@@ -143,8 +179,12 @@ export function Dashboard() {
     }
   }
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const formatTime = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(dateObj.getTime())) {
+      return '--:--'
+    }
+    return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
   return (
@@ -207,22 +247,39 @@ export function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Next Download</CardTitle>
-            <Server className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Audio Processing</CardTitle>
+            <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-              {nextScheduled?.schedule.nextRun 
-                ? formatNextRun(nextScheduled.schedule.nextRun)
-                : '--'
-              }
+            <div className={`text-2xl font-bold ${systemStatus?.ffmpeg?.available ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+              {systemStatus?.ffmpeg?.available ? 'FFmpeg' : 'Fallback'}
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-400">
-              {nextScheduled?.profile.name || 'No scheduled downloads'}
+              {systemStatus?.ffmpeg?.available ? 'Full audio processing' : 'Basic file operations'}
             </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* System Status Info */}
+      {systemStatus?.ffmpeg && !systemStatus.ffmpeg.available && (
+        <Card className="border-orange-200 bg-orange-50 dark:bg-orange-900/20">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-orange-800 dark:text-orange-200">
+              <AlertCircle className="h-5 w-5" />
+              <span>Audio Processing Limited</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-orange-700 dark:text-orange-300 mb-3">
+              FFmpeg is not available. Audio processing features like trimming, format conversion, and metadata embedding are limited.
+            </p>
+            <p className="text-sm text-orange-600 dark:text-orange-400">
+              Install FFmpeg to enable full audio processing capabilities. See the FFMPEG_SETUP.md guide for installation instructions.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent Activity */}
       <Card>

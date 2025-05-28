@@ -142,11 +142,18 @@ export class FileWatcherService {
       const watcher = chokidar.watch(Array.from(watchDirectories), {
         ignored: /(^|[\/\\])\../, // ignore dotfiles
         persistent: true,
-        ignoreInitial: false, // Process existing files
+        ignoreInitial: true, // Don't process existing files on startup to avoid duplicates
         awaitWriteFinish: {
-          stabilityThreshold: 2000,
+          stabilityThreshold: 1000, // Reduced from 2000ms
           pollInterval: 100
-        }
+        },
+        usePolling: false, // Use native OS events for better real-time detection
+        interval: 100, // Polling interval if usePolling is true
+        binaryInterval: 300,
+        alwaysStat: false,
+        depth: undefined, // Watch subdirectories
+        followSymlinks: true,
+        atomic: true // Don't emit events on atomic writes until complete
       })
 
       // Set up event handlers
@@ -164,10 +171,13 @@ export class FileWatcherService {
         .on('error', (error) => {
           logger.error(`Watcher error for show ${show.name}:`, error)
         })
-        .on('ready', () => {
+        .on('ready', async () => {
           const patternList = watchPatterns.map(p => p.pattern).join(', ')
           const dirList = Array.from(watchDirectories).join(', ')
           logger.info(`Started watching ${show.name}: patterns [${patternList}] in directories [${dirList}]`)
+          
+          // Scan for existing files since we set ignoreInitial: true
+          await this.scanExistingFiles(show, Array.from(watchDirectories))
         })
 
       this.state.watchers.set(showId, watcher)
@@ -176,6 +186,45 @@ export class FileWatcherService {
     } catch (error) {
       logger.error(`Failed to start watching show ${showId}:`, error)
       throw error
+    }
+  }
+
+  private async scanExistingFiles(show: ShowProfile, watchDirectories: string[]): Promise<void> {
+    try {
+      logger.debug(`Scanning existing files for show: ${show.name}`)
+      
+      for (const watchDir of watchDirectories) {
+        try {
+          if (!await fs.pathExists(watchDir)) {
+            continue
+          }
+
+          const files = await fs.readdir(watchDir)
+          
+          for (const filename of files) {
+            const filePath = path.join(watchDir, filename)
+            const stats = await fs.stat(filePath)
+            
+            if (stats.isFile()) {
+              // Check if file matches any pattern
+              const matchingPattern = this.findMatchingPattern(filename, show.filePatterns)
+              if (matchingPattern) {
+                // Check if file is already in queue
+                const queue = await this.storageService.getQueue()
+                const existingFile = queue.find(f => f.filename === filename && f.showId === show.id)
+                if (!existingFile) {
+                  logger.info(`Found existing file: ${filename} for show: ${show.name}`)
+                  await this.handleFileDetected(filePath, show)
+                }
+              }
+            }
+          }
+        } catch (error) {
+          logger.error(`Error scanning directory ${watchDir}:`, error)
+        }
+      }
+    } catch (error) {
+      logger.error(`Error scanning existing files for show ${show.name}:`, error)
     }
   }
 

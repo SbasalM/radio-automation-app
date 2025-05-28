@@ -4,6 +4,7 @@ import { promisify } from 'util'
 import { createLogger } from '../utils/logger'
 import { QueuedFile, FileOperationResult } from '../types'
 import { ShowProfile } from './storage'
+import { AudioProcessorService } from './audioProcessor'
 
 const logger = createLogger()
 
@@ -18,11 +19,13 @@ export class FileOperationsService {
   private readonly allowedExtensions: string[]
   private readonly tempDir: string
   private readonly outputBaseDir: string
+  private readonly audioProcessor: AudioProcessorService
 
   constructor() {
     this.allowedExtensions = (process.env.ALLOWED_EXTENSIONS || '.mp3,.wav,.flac,.aac,.m4a').split(',')
     this.tempDir = process.env.TEMP_DIR || './temp'
     this.outputBaseDir = process.env.OUTPUT_BASE_DIR || path.join(process.cwd(), 'processed')
+    this.audioProcessor = new AudioProcessorService()
   }
 
   async processFile(file: QueuedFile, show: ShowProfile): Promise<ProcessFileResult> {
@@ -60,8 +63,12 @@ export class FileOperationsService {
         const resolvedPath = await this.resolveFileConflict(outputPath)
         logger.info(`File conflict resolved: ${outputPath} -> ${resolvedPath}`)
         
-        // Copy file to resolved path
-        await this.copyFileWithProgress(file.sourcePath, resolvedPath)
+        // Process audio file to resolved path
+        const audioResult = await this.audioProcessor.processAudio(file.sourcePath, resolvedPath, show)
+        
+        if (!audioResult.success) {
+          throw new Error(audioResult.error || 'Audio processing failed')
+        }
         
         return {
           success: true,
@@ -70,8 +77,12 @@ export class FileOperationsService {
         }
       }
 
-      // Copy file to output location
-      await this.copyFileWithProgress(file.sourcePath, outputPath)
+      // Process audio file to output location
+      const audioResult = await this.audioProcessor.processAudio(file.sourcePath, outputPath, show)
+      
+      if (!audioResult.success) {
+        throw new Error(audioResult.error || 'Audio processing failed')
+      }
 
       logger.info(`File successfully processed: ${file.filename} -> ${outputPath}`)
       
@@ -94,8 +105,12 @@ export class FileOperationsService {
 
   private generateOutputFilename(originalFilename: string, show: ShowProfile): string {
     try {
-      const ext = path.extname(originalFilename)
-      const nameWithoutExt = path.basename(originalFilename, ext)
+      const originalExt = path.extname(originalFilename)
+      const nameWithoutExt = path.basename(originalFilename, originalExt)
+      
+      // Determine output extension based on processing settings
+      const outputFormat = show.processingOptions?.audioSettings?.outputFormat || 'wav'
+      const outputExt = outputFormat.startsWith('.') ? outputFormat : `.${outputFormat}`
       
       // Use show's file naming rules if available
       if (show.fileNamingRules?.outputPattern) {
@@ -117,12 +132,12 @@ export class FileOperationsService {
         // Sanitize the filename
         outputName = this.sanitizeFilename(outputName)
         
-        return `${outputName}${ext}`
+        return `${outputName}${outputExt}`
       }
       
-      // Fallback: Just use sanitized show name (as requested)
+      // Fallback: Just use sanitized show name with correct extension
       const cleanShowName = this.sanitizeFilename(show.name)
-      return `${cleanShowName}${ext}`
+      return `${cleanShowName}${outputExt}`
       
     } catch (error) {
       logger.warn(`Error generating output filename, using original: ${originalFilename}`)

@@ -32,6 +32,10 @@ export function Waveform({
   const [isDragging, setIsDragging] = useState<'start' | 'end' | null>(null)
   const [hoverTime, setHoverTime] = useState<number | null>(null)
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null)
+  const [cursorType, setCursorType] = useState<'default' | 'col-resize' | 'pointer' | 'grab' | 'grabbing'>('default')
+  const [isPanning, setIsPanning] = useState(false)
+  const [panOffset, setPanOffset] = useState(0) // Horizontal pan offset in pixels
+  const [lastPanX, setLastPanX] = useState(0)
 
   const timeRulerHeight = 30
   const waveformHeight = height - timeRulerHeight
@@ -48,14 +52,16 @@ export function Waveform({
   // Convert time to pixel position
   const timeToPixel = useCallback((time: number): number => {
     const canvasWidth = getCanvasWidth()
-    return (time / waveformData.duration) * canvasWidth * zoom
-  }, [waveformData.duration, zoom, getCanvasWidth])
+    const basePixel = (time / waveformData.duration) * canvasWidth * zoom
+    return basePixel + panOffset
+  }, [waveformData.duration, zoom, panOffset, getCanvasWidth])
 
   // Convert pixel position to time
   const pixelToTime = useCallback((pixel: number): number => {
     const canvasWidth = getCanvasWidth()
-    return (pixel / (canvasWidth * zoom)) * waveformData.duration
-  }, [waveformData.duration, zoom, getCanvasWidth])
+    const adjustedPixel = pixel - panOffset
+    return (adjustedPixel / (canvasWidth * zoom)) * waveformData.duration
+  }, [waveformData.duration, zoom, panOffset, getCanvasWidth])
 
   // Draw waveform
   const drawWaveform = useCallback(() => {
@@ -83,25 +89,25 @@ export function Waveform({
     ctx.fillStyle = '#334155' // slate-700
     ctx.fillRect(0, waveformHeight, canvasWidth, timeRulerHeight)
 
-    // Calculate visible peaks
-    const peaksPerPixel = Math.max(1, Math.floor(waveformData.peaks.length / (canvasWidth * zoom)))
-    const visiblePeaks = Math.min(waveformData.peaks.length, canvasWidth * zoom)
+    // Calculate visible peaks with better zoom handling
+    const totalSamples = waveformData.peaks.length
+    const visibleSamples = Math.floor(totalSamples / zoom)
+    
+    // Calculate which part of the waveform is visible based on pan offset
+    const panRatio = -panOffset / (canvasWidth * zoom)
+    const startSample = Math.max(0, Math.floor(panRatio * totalSamples))
+    const endSample = Math.min(totalSamples, startSample + visibleSamples)
 
     // Draw waveform peaks
     ctx.fillStyle = '#3b82f6' // blue-500
     
     for (let x = 0; x < canvasWidth; x++) {
-      const peakIndex = Math.floor((x / canvasWidth) * visiblePeaks)
-      if (peakIndex >= waveformData.peaks.length) break
+      const progress = x / canvasWidth
+      const sampleIndex = Math.floor(startSample + progress * (endSample - startSample))
+      
+      if (sampleIndex >= waveformData.peaks.length) break
 
-      // Average nearby peaks for smoother visualization when zoomed out
-      let peakValue = 0
-      const peakCount = Math.max(1, peaksPerPixel)
-      for (let i = 0; i < peakCount && peakIndex + i < waveformData.peaks.length; i++) {
-        peakValue += waveformData.peaks[peakIndex + i]
-      }
-      peakValue /= peakCount
-
+      const peakValue = waveformData.peaks[sampleIndex]
       const peakHeight = peakValue * (waveformHeight - 20) // Leave some padding
       const y = (waveformHeight - peakHeight) / 2
 
@@ -141,15 +147,37 @@ export function Waveform({
       ctx.lineTo(endPixel, waveformHeight)
       ctx.stroke()
 
-      // Draw drag handles
-      const handleSize = 8
-      ctx.fillStyle = '#ef4444' // red-500
+      // Draw drag handles - larger and more visible
+      const handleWidth = 12
+      const handleHeight = 20
       
       // Start handle
-      ctx.fillRect(startPixel - handleSize / 2, waveformHeight - handleSize - 5, handleSize, handleSize)
+      ctx.fillStyle = '#dc2626' // red-600
+      ctx.fillRect(startPixel - handleWidth / 2, waveformHeight - handleHeight, handleWidth, handleHeight)
+      
+      // Handle grip lines
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 1
+      for (let i = 0; i < 3; i++) {
+        const gripX = startPixel - 3 + (i * 2)
+        ctx.beginPath()
+        ctx.moveTo(gripX, waveformHeight - handleHeight + 4)
+        ctx.lineTo(gripX, waveformHeight - 4)
+        ctx.stroke()
+      }
       
       // End handle
-      ctx.fillRect(endPixel - handleSize / 2, waveformHeight - handleSize - 5, handleSize, handleSize)
+      ctx.fillStyle = '#dc2626' // red-600
+      ctx.fillRect(endPixel - handleWidth / 2, waveformHeight - handleHeight, handleWidth, handleHeight)
+      
+      // Handle grip lines
+      for (let i = 0; i < 3; i++) {
+        const gripX = endPixel - 3 + (i * 2)
+        ctx.beginPath()
+        ctx.moveTo(gripX, waveformHeight - handleHeight + 4)
+        ctx.lineTo(gripX, waveformHeight - 4)
+        ctx.stroke()
+      }
     }
 
     // Draw playhead
@@ -168,12 +196,22 @@ export function Waveform({
     ctx.font = '10px sans-serif'
     ctx.textAlign = 'center'
 
-    const timeStep = Math.max(5, Math.floor(waveformData.duration / (canvasWidth / 60))) // Tick every ~60px
-    for (let time = 0; time <= waveformData.duration; time += timeStep) {
-      const x = timeToPixel(time)
-      if (x > canvasWidth) break
+    // Calculate visible time range based on pan offset and zoom
+    const totalDuration = waveformData.duration
+    const visibleDuration = totalDuration / zoom
+    const panTimeOffset = (-panOffset / (canvasWidth * zoom)) * totalDuration
+    const startTime = Math.max(0, panTimeOffset)
+    const endTime = Math.min(totalDuration, startTime + visibleDuration)
+    
+    const timeStep = Math.max(1, Math.floor(visibleDuration / (canvasWidth / 60))) // Tick every ~60px
+    for (let time = Math.floor(startTime); time <= endTime; time += timeStep) {
+      const relativeTime = time - startTime
+      const x = (relativeTime / visibleDuration) * canvasWidth
+      
+      if (x < 0 || x > canvasWidth) continue
 
       // Draw tick mark
+      ctx.strokeStyle = '#64748b'
       ctx.beginPath()
       ctx.moveTo(x, waveformHeight)
       ctx.lineTo(x, waveformHeight + 5)
@@ -226,7 +264,8 @@ export function Waveform({
     height, 
     readonly,
     timeToPixel,
-    getCanvasWidth
+    getCanvasWidth,
+    panOffset
   ])
 
   // Handle mouse events
@@ -240,11 +279,48 @@ export function Waveform({
 
     setMousePosition({ x, y })
 
+    // Handle panning
+    if (isPanning && zoom > 1) {
+      const deltaX = x - lastPanX
+      const newPanOffset = panOffset + deltaX
+      
+      // Limit pan offset to reasonable bounds - allow more movement
+      const canvasWidth = getCanvasWidth()
+      const totalWidth = canvasWidth * zoom
+      const maxPan = totalWidth - canvasWidth // Allow panning to show all content
+      const minPan = -maxPan // Allow panning in both directions
+      
+      setPanOffset(Math.max(minPan, Math.min(maxPan, newPanOffset)))
+      setLastPanX(x)
+      setCursorType('grabbing')
+      return
+    }
+
     if (y < waveformHeight) {
       const time = pixelToTime(x)
       setHoverTime(Math.max(0, Math.min(waveformData.duration, time)))
+      
+      // Determine cursor type based on position
+      if (!readonly && trimPoints) {
+        const startPixel = timeToPixel(trimPoints.startTime)
+        const endPixel = timeToPixel(trimPoints.endTime)
+        const handleWidth = 12
+        
+        if (Math.abs(x - startPixel) <= handleWidth / 2 || Math.abs(x - endPixel) <= handleWidth / 2) {
+          setCursorType('col-resize')
+        } else if (zoom > 1) {
+          setCursorType('grab')
+        } else {
+          setCursorType('pointer')
+        }
+      } else if (zoom > 1) {
+        setCursorType('grab')
+      } else {
+        setCursorType('pointer')
+      }
     } else {
       setHoverTime(null)
+      setCursorType('default')
     }
 
     // Handle dragging trim points
@@ -252,18 +328,47 @@ export function Waveform({
       const time = Math.max(0, Math.min(waveformData.duration, pixelToTime(x)))
       
       if (isDragging === 'start') {
-        onTrimChange({
-          ...trimPoints,
-          startTime: Math.min(time, trimPoints.endTime - 1)
-        })
+        // Ensure start time doesn't go beyond end time minus minimum gap
+        const minGap = 1 // minimum 1 second between handles
+        const maxStartTime = Math.max(0, trimPoints.endTime - minGap)
+        const newStartTime = Math.min(time, maxStartTime)
+        
+        // Only update if there's a meaningful change to prevent loops
+        if (Math.abs(newStartTime - trimPoints.startTime) > 0.1) {
+          onTrimChange({
+            ...trimPoints,
+            startTime: newStartTime
+          })
+        }
       } else if (isDragging === 'end') {
-        onTrimChange({
-          ...trimPoints,
-          endTime: Math.max(time, trimPoints.startTime + 1)
-        })
+        // Ensure end time doesn't go before start time plus minimum gap
+        const minGap = 1 // minimum 1 second between handles
+        const minEndTime = Math.min(waveformData.duration, trimPoints.startTime + minGap)
+        const newEndTime = Math.max(time, minEndTime)
+        
+        // Only update if there's a meaningful change to prevent loops
+        if (Math.abs(newEndTime - trimPoints.endTime) > 0.1) {
+          onTrimChange({
+            ...trimPoints,
+            endTime: newEndTime
+          })
+        }
       }
     }
-  }, [isDragging, trimPoints, onTrimChange, pixelToTime, waveformData.duration, waveformHeight])
+  }, [
+    isDragging, 
+    trimPoints, 
+    pixelToTime, 
+    waveformData.duration, 
+    waveformHeight, 
+    readonly, 
+    timeToPixel,
+    isPanning,
+    zoom,
+    panOffset,
+    lastPanX,
+    getCanvasWidth
+  ])
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (readonly) return
@@ -279,34 +384,46 @@ export function Waveform({
       if (trimPoints) {
         const startPixel = timeToPixel(trimPoints.startTime)
         const endPixel = timeToPixel(trimPoints.endTime)
-        const handleSize = 8
+        const handleWidth = 12
 
         // Check if clicking on trim handles
-        if (Math.abs(x - startPixel) <= handleSize) {
+        if (Math.abs(x - startPixel) <= handleWidth / 2) {
           setIsDragging('start')
           return
         }
         
-        if (Math.abs(x - endPixel) <= handleSize) {
+        if (Math.abs(x - endPixel) <= handleWidth / 2) {
           setIsDragging('end')
           return
         }
+      }
+
+      // Start panning if zoomed in and not clicking on handles
+      if (zoom > 1) {
+        setIsPanning(true)
+        setLastPanX(x)
+        setCursorType('grabbing')
+        return
       }
 
       // Click to set playhead position
       const time = pixelToTime(x)
       onTimeClick?.(Math.max(0, Math.min(waveformData.duration, time)))
     }
-  }, [readonly, trimPoints, timeToPixel, pixelToTime, onTimeClick, waveformData.duration, waveformHeight])
+  }, [readonly, trimPoints, timeToPixel, pixelToTime, onTimeClick, waveformData.duration, waveformHeight, zoom])
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(null)
+    setIsPanning(false)
+    setCursorType('default')
   }, [])
 
   const handleMouseLeave = useCallback(() => {
     setHoverTime(null)
     setMousePosition(null)
     setIsDragging(null)
+    setIsPanning(false)
+    setCursorType('default')
   }, [])
 
   // Zoom controls
@@ -320,6 +437,7 @@ export function Waveform({
 
   const handleZoomReset = useCallback(() => {
     setZoom(1)
+    setPanOffset(0)
   }, [])
 
   // Redraw when dependencies change
@@ -383,7 +501,13 @@ export function Waveform({
       >
         <canvas
           ref={canvasRef}
-          className="w-full cursor-crosshair"
+          className={`w-full ${
+            cursorType === 'col-resize' ? 'cursor-col-resize' : 
+            cursorType === 'pointer' ? 'cursor-pointer' : 
+            cursorType === 'grab' ? 'cursor-grab' :
+            cursorType === 'grabbing' ? 'cursor-grabbing' :
+            'cursor-default'
+          }`}
           onMouseMove={handleMouseMove}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
@@ -393,7 +517,7 @@ export function Waveform({
 
       {!readonly && (
         <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-          Click to set playback position. {trimPoints ? 'Drag red handles to adjust trim points.' : ''}
+          Click anywhere on the waveform to set playback position. {trimPoints ? 'Drag the red handles at the bottom to adjust trim points.' : ''} Use zoom controls for precise editing. {zoom > 1 ? 'When zoomed in, drag the waveform to pan left/right.' : ''}
         </div>
       )}
     </div>

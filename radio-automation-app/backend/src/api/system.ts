@@ -3,22 +3,31 @@ import { createLogger } from '../utils/logger'
 import { asyncHandler } from '../utils/errorHandler'
 import { StorageService } from '../services/storage'
 import { FileWatcherService } from '../services/fileWatcher'
+import { AudioProcessorService } from '../services/audioProcessor'
 import { ApiResponse, ScanFilesRequest } from '../types'
 
 const router = Router()
 const logger = createLogger()
 const storage = StorageService.getInstance()
+const audioProcessor = new AudioProcessorService()
 
 // GET /api/system/status - Get overall system status
 router.get('/status', asyncHandler(async (req: Request, res: Response) => {
   const systemStatus = await storage.getSystemStatus()
   const watcherStatus = FileWatcherService.getInstance().getStatus()
+  const ffmpegAvailable = await audioProcessor.checkFFmpegAvailability()
   
   const response: ApiResponse = {
     success: true,
     data: {
       ...systemStatus,
-      fileWatcher: watcherStatus
+      fileWatcher: watcherStatus,
+      ffmpeg: {
+        available: ffmpegAvailable,
+        message: ffmpegAvailable 
+          ? 'FFmpeg is available for audio processing'
+          : 'FFmpeg not found - audio processing will use fallback mode'
+      }
     }
   }
   
