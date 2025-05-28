@@ -50,54 +50,141 @@ export function EnhancedTrimEditor({
 
   // Generate waveform data on mount
   useEffect(() => {
-    setIsLoading(true)
-    const waveform = audioService.generateWaveformData(audioFile, 800)
-    setWaveformData(waveform)
-    setIsLoading(false)
-    
-    // Create audio element for playback if we have a valid file path
-    if (audioFile.filePath && !audioFile.filePath.startsWith('/sample/')) {
+    const generateWaveform = async () => {
+      setIsLoading(true)
       try {
-        const audio = new Audio()
+        console.log(`🎵 Starting waveform generation for: ${audioFile.filename}`)
+        console.log(`📏 Audio file duration: ${audioFile.duration}s`)
+        const waveform = await audioService.generateWaveformData(audioFile, 800)
+        console.log(`📊 Waveform received: ${waveform.peaks.length} peaks, duration: ${waveform.duration}s`)
+        setWaveformData(waveform)
         
-        // Handle different file path formats
-        let audioSrc = audioFile.filePath
-        if (audioSrc.startsWith('blob:')) {
-          // Already a blob URL
-          audio.src = audioSrc
-        } else if (audioSrc.startsWith('http')) {
-          // HTTP URL
-          audio.src = audioSrc
+        // Ensure trim points are properly set when waveform loads
+        // Reset to full duration if current points are invalid
+        if (trimPoints.endTime === 0 || trimPoints.endTime > audioFile.duration || trimPoints.startTime >= trimPoints.endTime) {
+          const correctedTrimPoints: TrimPoints = {
+            startTime: 0,
+            endTime: audioFile.duration,
+            fadeInDuration: 0,
+            fadeOutDuration: 0
+          }
+          setTrimPoints(correctedTrimPoints)
+          console.log(`🔧 Reset trim points to full duration: 0s - ${audioFile.duration}s`)
         } else {
-          // Local file path - this might not work in browser, but we'll try
-          audio.src = audioSrc
+          console.log(`✅ Trim points valid: ${trimPoints.startTime}s - ${trimPoints.endTime}s`)
         }
         
-        audio.preload = 'metadata'
-        audio.onloadedmetadata = () => {
-          console.log('Audio loaded successfully, duration:', audio.duration)
-        }
-        audio.onerror = (e) => {
-          console.warn('Audio loading failed:', e)
+      } catch (error) {
+        console.error('Failed to generate waveform:', error)
+        setWaveformData(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    generateWaveform()
+    
+    // Create audio element for playback - use backend audio API with retry logic
+    if (audioFile.filename) {
+      const createAudioElement = async (retryCount = 0) => {
+        try {
+          console.log(`🎧 Creating audio element for: ${audioFile.filename} (attempt ${retryCount + 1})`)
+          const audio = new Audio()
+          
+          // Use the backend audio API endpoint for all files
+          const audioSrc = `http://localhost:3001/api/audio/${audioFile.filename}`
+          console.log(`🔗 Audio source: ${audioSrc}`)
+          
+          // Set CORS and preload settings before setting src
+          audio.crossOrigin = 'anonymous'
+          audio.preload = 'metadata'
+          
+          // Add timeout and retry logic for uploaded files
+          let audioLoaded = false
+          let retryTimeout: NodeJS.Timeout
+          
+          const onSuccess = () => {
+            if (!audioLoaded) {
+              audioLoaded = true
+              clearTimeout(retryTimeout)
+              // Use the pre-calculated duration from audioFile instead of browser detection
+              console.log(`✅ Audio loaded successfully, using pre-calculated duration: ${audioFile.duration}s (browser detected: ${audio.duration}s)`)
+              setAudioElement(audio)
+            }
+          }
+          
+          const onError = (e: string | Event) => {
+            if (!audioLoaded) {
+              console.warn(`⚠️ Audio loading attempt ${retryCount + 1} failed:`, e)
+              
+              // Log more details about the error
+              if (e instanceof Event && e.target) {
+                const audioEl = e.target as HTMLAudioElement
+                console.warn('Audio element error details:', {
+                  error: audioEl.error,
+                  networkState: audioEl.networkState,
+                  readyState: audioEl.readyState,
+                  src: audioEl.src
+                })
+              }
+              
+              // For temp files (just uploaded), try again after a short delay
+              if (audioFile.filename.startsWith('temp_') && retryCount < 3) {
+                clearTimeout(retryTimeout)
+                retryTimeout = setTimeout(() => {
+                  console.log(`🔄 Retrying audio load (attempt ${retryCount + 2})...`)
+                  createAudioElement(retryCount + 1)
+                }, 1000 * (retryCount + 1)) // Exponential backoff: 1s, 2s, 3s
+                return
+              }
+              
+              // Try fallback if available
+              if (audioFile.filePath && !audioFile.filePath.startsWith('/sample/')) {
+                console.log('🔄 Trying fallback audio source:', audioFile.filePath)
+                audio.src = audioFile.filePath
+              } else {
+                console.log('❌ Audio playback not available for this file')
+                setAudioElement(null)
+              }
+            }
+          }
+          
+          audio.onloadedmetadata = onSuccess
+          audio.onerror = onError as OnErrorEventHandler
+          
+          // For temp files, add a longer timeout since they're just uploaded
+          const timeoutDuration = audioFile.filename.startsWith('temp_') ? 5000 : 3000
+          retryTimeout = setTimeout(() => {
+            if (!audioLoaded) {
+              console.warn(`⏰ Audio load timeout after ${timeoutDuration}ms`)
+              onError(new Event('timeout'))
+            }
+          }, timeoutDuration)
+          
+          audio.src = audioSrc
+          
+          return () => {
+            clearTimeout(retryTimeout)
+            if (audio) {
+              audio.pause()
+              audio.src = ''
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to create audio element:', error)
           setAudioElement(null)
         }
-        
-        setAudioElement(audio)
-        
-        return () => {
-          // Cleanup audio element
-          if (audio) {
-            audio.pause()
-            audio.src = ''
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to create audio element:', error)
-        setAudioElement(null)
       }
+      
+      // For temp files (just uploaded), add a small initial delay
+      const initialDelay = audioFile.filename.startsWith('temp_') ? 500 : 0
+      setTimeout(() => {
+        createAudioElement()
+      }, initialDelay)
+      
     } else {
-      // For mock/sample files, disable audio playback
-      console.log('Using mock file, audio playback disabled')
+      // For files without names, disable audio playback
+      console.log('No filename available, audio playback disabled')
       setAudioElement(null)
     }
   }, [audioFile])
@@ -138,8 +225,8 @@ export function EnhancedTrimEditor({
 
   // Handle manual trim point input
   const handleStartTimeChange = useCallback((value: string) => {
-    const time = audioService.parseTime(value)
-    if (!isNaN(time)) {
+    const time = parseFloat(value)
+    if (!isNaN(time) && time >= 0) {
       handleTrimChange({
         ...trimPoints,
         startTime: time
@@ -148,8 +235,8 @@ export function EnhancedTrimEditor({
   }, [trimPoints, handleTrimChange])
 
   const handleEndTimeChange = useCallback((value: string) => {
-    const time = audioService.parseTime(value)
-    if (!isNaN(time)) {
+    const time = parseFloat(value)
+    if (!isNaN(time) && time >= 0) {
       handleTrimChange({
         ...trimPoints,
         endTime: time
@@ -214,14 +301,25 @@ export function EnhancedTrimEditor({
       audioElement.pause()
       setIsPlaying(false)
     } else {
-      // Start playback from trim start time
-      audioElement.currentTime = trimPoints.startTime
+      // Start playback from trim start time, converting actual time to browser time
+      const browserDuration = audioElement.duration || 60
+      const actualDuration = audioFile.duration
+      const timeRatio = browserDuration / actualDuration
+      const browserStartTime = trimPoints.startTime * timeRatio
+      
+      audioElement.currentTime = browserStartTime
       audioElement.play().then(() => {
         setIsPlaying(true)
         
-        // Stop at trim end time
+        // Stop at trim end time using audioFile duration for calculations
         const checkEndTime = () => {
-          if (audioElement.currentTime >= trimPoints.endTime) {
+          // Use the correct duration ratio to map browser time to actual time
+          const browserDuration = audioElement.duration || 60
+          const actualDuration = audioFile.duration
+          const timeRatio = actualDuration / browserDuration
+          const adjustedCurrentTime = audioElement.currentTime * timeRatio
+          
+          if (adjustedCurrentTime >= trimPoints.endTime) {
             audioElement.pause()
             setIsPlaying(false)
           } else if (isPlaying) {
@@ -234,21 +332,27 @@ export function EnhancedTrimEditor({
         alert('Audio playback failed. This might be due to file format or browser restrictions.')
       })
     }
-  }, [audioElement, isPlaying, trimPoints.startTime, trimPoints.endTime])
+  }, [audioElement, isPlaying, trimPoints.startTime, trimPoints.endTime, audioFile.duration])
   
   // Update playhead position during playback
   useEffect(() => {
     if (!audioElement || !isPlaying) return
     
     const updatePlayhead = () => {
-      setPlayheadPosition(audioElement.currentTime)
+      // Map browser time to actual audio time
+      const browserDuration = audioElement.duration || 60
+      const actualDuration = audioFile.duration
+      const timeRatio = actualDuration / browserDuration
+      const adjustedCurrentTime = audioElement.currentTime * timeRatio
+      
+      setPlayheadPosition(adjustedCurrentTime)
       if (isPlaying) {
         requestAnimationFrame(updatePlayhead)
       }
     }
     
     requestAnimationFrame(updatePlayhead)
-  }, [audioElement, isPlaying])
+  }, [audioElement, isPlaying, audioFile.duration])
 
   // Handle save
   const handleSave = useCallback(() => {
@@ -310,7 +414,20 @@ export function EnhancedTrimEditor({
             </div>
           </CardTitle>
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            File: {audioFile.filename}
+            <div className="flex items-center justify-between">
+              <span>File: {audioFile.filename}</span>
+              <span className="text-blue-600 dark:text-blue-400 font-medium">
+                🎯 Drag the red handles to set where audio will be trimmed
+              </span>
+            </div>
+            {waveformData && (
+              <div className="mt-1 text-xs">
+                <span className={waveformData.peaks.length === 800 ? "text-green-600" : "text-amber-600"}>
+                  Waveform: {waveformData.peaks.length} points 
+                  {waveformData.peaks.length === 800 ? " (Real data from backend)" : " (May be fallback data)"}
+                </span>
+              </div>
+            )}
           </div>
         </CardHeader>
       </Card>
@@ -327,6 +444,9 @@ export function EnhancedTrimEditor({
             playheadPosition={playheadPosition}
             onTimeClick={handleTimeClick}
             onTrimChange={handleTrimChange}
+            onPlayPause={handlePlayPause}
+            isPlaying={isPlaying}
+            canPlay={!!audioElement}
             height={150}
           />
         </CardContent>
@@ -342,28 +462,40 @@ export function EnhancedTrimEditor({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Start Time (MM:SS)
+                Start Time (seconds)
               </label>
               <input
-                type="text"
-                value={audioService.formatTime(trimPoints.startTime)}
+                type="number"
+                min="0"
+                max={audioFile.duration}
+                step="0.1"
+                value={trimPoints.startTime}
                 onChange={(e) => handleStartTimeChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
-                placeholder="0:00"
+                placeholder="0"
               />
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {audioService.formatTime(trimPoints.startTime)}
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                End Time (MM:SS)
+                End Time (seconds)
               </label>
               <input
-                type="text"
-                value={audioService.formatTime(trimPoints.endTime)}
+                type="number"
+                min="0"
+                max={audioFile.duration}
+                step="0.1"
+                value={trimPoints.endTime}
                 onChange={(e) => handleEndTimeChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
-                placeholder="0:00"
+                placeholder="0"
               />
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {audioService.formatTime(trimPoints.endTime)}
+              </div>
             </div>
           </div>
 
@@ -402,35 +534,6 @@ export function EnhancedTrimEditor({
 
           {/* Quick Actions */}
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePlayPause}
-              className={`${
-                audioElement 
-                  ? "bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40" 
-                  : "bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40"
-              }`}
-              title={
-                !audioElement 
-                  ? "Audio playback not available for this file type" 
-                  : isPlaying 
-                    ? "Pause audio preview" 
-                    : "Play trimmed audio section"
-              }
-            >
-              {isPlaying ? (
-                <>
-                  <Pause className="h-4 w-4 mr-2" />
-                  Pause Preview
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  {audioElement ? "Play Trimmed Audio" : "Play (Limited Support)"}
-                </>
-              )}
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -480,6 +583,23 @@ export function EnhancedTrimEditor({
                   <strong>Fades:</strong> {trimPoints.fadeInDuration > 0 ? `${trimPoints.fadeInDuration}s in` : 'No fade in'}, {trimPoints.fadeOutDuration > 0 ? `${trimPoints.fadeOutDuration}s out` : 'No fade out'}
                 </div>
               </div>
+              
+              {/* Debug info for uploaded files */}
+              {audioFile.filename && (
+                <div className="mt-2 pt-2 border-t border-blue-300 dark:border-blue-700">
+                  <div className="text-xs text-blue-600 dark:text-blue-400">
+                    <strong>Debug:</strong> <a 
+                      href={`http://localhost:3001/api/audio/${audioFile.filename}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-blue-800 dark:hover:text-blue-200"
+                    >
+                      Test direct audio access
+                    </a>
+                    {!audioElement && ' (Audio playback unavailable)'}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

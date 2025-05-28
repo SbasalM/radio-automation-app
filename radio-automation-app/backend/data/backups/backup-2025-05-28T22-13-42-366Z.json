@@ -16,7 +16,7 @@
       "autoProcessing": true,
       "id": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
       "createdAt": "2025-05-27T01:28:50.938Z",
-      "updatedAt": "2025-05-28T03:32:32.888Z",
+      "updatedAt": "2025-05-28T13:23:33.861Z",
       "metadataMapping": {
         "inputPatterns": [
           ""
@@ -39,8 +39,8 @@
         "invalidCharacterHandling": "underscore"
       },
       "trimSettings": {
-        "startSeconds": 38.7,
-        "endSeconds": 246.8,
+        "startSeconds": 33.8,
+        "endSeconds": 199.5,
         "fadeIn": false,
         "fadeOut": false
       },
@@ -88,17 +88,17 @@
       "showId": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
       "status": "completed",
       "sourcePath": "watch\\AnswersInGenesis_100424.wav",
-      "id": "f0fdb71a-e01f-42fa-a4e0-3063eca89d2e",
-      "addedAt": "2025-05-28T03:34:01.344Z",
-      "outputPath": "processed\\Answers_in_Genesis.mp3",
-      "processedAt": "2025-05-28T03:34:02.502Z",
-      "processingTimeMs": 1153
+      "id": "d2c1d445-a8b8-4f85-b687-6a1e8c0df8e9",
+      "addedAt": "2025-05-28T21:51:45.667Z",
+      "outputPath": "processed\\Answers_in_Genesis_2.mp3",
+      "processedAt": "2025-05-28T21:51:46.400Z",
+      "processingTimeMs": 732
     }
   ],
   "settings": {
     "version": "1.0.0",
     "watchInterval": 5000,
-    "lastBackup": "2025-05-28T03:34:02.502Z",
+    "lastBackup": "2025-05-28T21:51:46.400Z",
     "globalWatchDirectory": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\watch",
     "globalOutputDirectory": "C:\\Users\\enola\\OneDrive - Central Baptist Seminary of Minneapolis\\Radio Flow (Cursor)\\radio-automation-app\\backend\\output"
   }

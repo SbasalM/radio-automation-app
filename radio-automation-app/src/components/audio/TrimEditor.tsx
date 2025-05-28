@@ -32,10 +32,29 @@ export function TrimEditor({
 
   // Generate waveform data on mount
   useEffect(() => {
-    setIsLoading(true)
-    const waveform = audioService.generateWaveformData(audioFile, 800)
-    setWaveformData(waveform)
-    setIsLoading(false)
+    const generateWaveform = async () => {
+      setIsLoading(true)
+      try {
+        const waveform = await audioService.generateWaveformData(audioFile, 800)
+        setWaveformData(waveform)
+        
+        // Ensure trim points are properly set when waveform loads
+        // Reset to full duration if current points are invalid
+        if (trimPoints.endTime === 0 || trimPoints.endTime > audioFile.duration || trimPoints.startTime >= trimPoints.endTime) {
+          const correctedTrimPoints = audioService.getDefaultTrimPoints(audioFile)
+          setTrimPoints(correctedTrimPoints)
+          console.log(`🔧 Reset trim points to default: ${correctedTrimPoints.startTime}s - ${correctedTrimPoints.endTime}s`)
+        }
+        
+      } catch (error) {
+        console.error('Failed to generate waveform:', error)
+        setWaveformData(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    generateWaveform()
   }, [audioFile])
 
   // Validate trim points whenever they change

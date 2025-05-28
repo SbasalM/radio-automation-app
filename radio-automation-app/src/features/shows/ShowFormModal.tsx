@@ -272,19 +272,9 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
       // Try to use the actual audio file if available
       const actualFileName = 'AnswersInGenesis_100424.wav' // The actual file we know exists
       
-      // Create audio file object for the real file
-      const realAudioFile: AudioFile = {
-        id: 'real-' + Date.now(),
-        filename: actualFileName,
-        duration: 541, // 9:01 in seconds - we'll get this from the backend later
-        sampleRate: 44100,
-        channels: 2,
-        format: 'wav',
-        fileSize: 10585084, // Actual file size from ls command
-        filePath: `http://localhost:3001/api/audio/${actualFileName}`, // Serve via backend
-        createdAt: new Date(),
-        lastModified: new Date()
-      }
+      // Use the audio service to get real audio metadata
+      const realAudioFile = await audioService.analyzeAudioFile(actualFileName, 10585084)
+      console.log('Loaded real audio file:', realAudioFile)
       
       setSampleAudioFile(realAudioFile)
       
@@ -301,20 +291,20 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
     } catch (error) {
       console.error('Failed to load sample file:', error)
       
-      // Fallback to mock file
-      const mockAudioFile: AudioFile = {
+      // Fallback to known values for the test file
+      const fallbackAudioFile: AudioFile = {
         id: 'sample-' + Date.now(),
-        filename: 'sample-audio.wav',
-        duration: 541,
+        filename: 'AnswersInGenesis_100424.wav',
+        duration: 541, // Known correct duration
         sampleRate: 44100,
         channels: 2,
         format: 'wav',
-        fileSize: 10 * 1024 * 1024,
-        filePath: '/sample/sample-audio.wav',
+        fileSize: 10585084, // Known file size
+        filePath: 'http://localhost:3001/api/audio/AnswersInGenesis_100424.wav',
         createdAt: new Date(),
         lastModified: new Date()
       }
-      setSampleAudioFile(mockAudioFile)
+      setSampleAudioFile(fallbackAudioFile)
     }
   }
 
@@ -848,9 +838,28 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
                                   const droppedFile = files.find(f => f.type.startsWith('audio/'))
                                   if (droppedFile) {
                                     try {
-                                      // Use audio service to analyze the dropped file
-                                      const audioFileObj = await audioService.analyzeAudioFile(droppedFile.name, droppedFile.size)
-                                      audioFileObj.filePath = URL.createObjectURL(droppedFile)
+                                      console.log('Uploading dropped audio file:', droppedFile.name, droppedFile.size)
+                                      
+                                      // Upload the file to the backend for temporary preview
+                                      const uploadFormData = new FormData()
+                                      uploadFormData.append('audio', droppedFile)
+                                      
+                                      const uploadResponse = await fetch('http://localhost:3001/api/audio/upload-sample', {
+                                        method: 'POST',
+                                        body: uploadFormData
+                                      })
+                                      
+                                      if (!uploadResponse.ok) {
+                                        throw new Error('Upload failed')
+                                      }
+                                      
+                                      const uploadResult = await uploadResponse.json()
+                                      console.log('File uploaded successfully:', uploadResult)
+                                      
+                                      // Now get proper audio metadata using the uploaded filename
+                                      const audioFileObj = await audioService.analyzeAudioFile(uploadResult.filename, uploadResult.size)
+                                      
+                                      console.log('Created audio file object:', audioFileObj)
                                       setSampleAudioFile(audioFileObj)
                                       
                                       // Set default trim points to full duration if none exist
@@ -864,8 +873,8 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
                                         })
                                       }
                                     } catch (error) {
-                                      console.error('Failed to analyze dropped audio file:', error)
-                                      alert('Failed to analyze audio file. Please try again.')
+                                      console.error('Failed to upload and analyze audio file:', error)
+                                      alert('Failed to upload audio file. Please try again.')
                                     }
                                   }
                                 }}

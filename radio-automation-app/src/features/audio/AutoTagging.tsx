@@ -66,7 +66,7 @@ export function AutoTagging() {
 
       // Analyze audio file
       const audioFile = await audioService.analyzeAudioFile(file.filename, 0)
-      const waveform = audioService.generateWaveformData(audioFile, 800)
+      const waveform = await audioService.generateWaveformData(audioFile, 800)
       
       setSelectedFile({ file, audioFile })
       setWaveformData(waveform)

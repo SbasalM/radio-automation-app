@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Play, Pause } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { WaveformData, TrimPoints } from '@/types/audio'
 
@@ -9,6 +9,9 @@ interface WaveformProps {
   playheadPosition?: number // Current playback position in seconds
   onTimeClick?: (time: number) => void
   onTrimChange?: (trimPoints: TrimPoints) => void
+  onPlayPause?: () => void // New prop for play/pause
+  isPlaying?: boolean // New prop for play state
+  canPlay?: boolean // New prop to indicate if audio is available
   className?: string
   height?: number
   showControls?: boolean
@@ -21,6 +24,9 @@ export function Waveform({
   playheadPosition = 0,
   onTimeClick,
   onTrimChange,
+  onPlayPause,
+  isPlaying,
+  canPlay,
   className = '',
   height = 120,
   showControls = true,
@@ -131,52 +137,73 @@ export function Waveform({
         ctx.fillRect(endPixel, 0, canvasWidth - endPixel, waveformHeight)
       }
 
-      // Draw trim handles
+      // Draw trim lines
       ctx.strokeStyle = '#ef4444' // red-500
       ctx.lineWidth = 2
       
       // Start trim line
-      ctx.beginPath()
-      ctx.moveTo(startPixel, 0)
-      ctx.lineTo(startPixel, waveformHeight)
-      ctx.stroke()
+      if (startPixel > 0) {
+        ctx.beginPath()
+        ctx.moveTo(startPixel, 0)
+        ctx.lineTo(startPixel, waveformHeight)
+        ctx.stroke()
+      }
       
       // End trim line
-      ctx.beginPath()
-      ctx.moveTo(endPixel, 0)
-      ctx.lineTo(endPixel, waveformHeight)
-      ctx.stroke()
+      if (endPixel < canvasWidth) {
+        ctx.beginPath()
+        ctx.moveTo(endPixel, 0)
+        ctx.lineTo(endPixel, waveformHeight)
+        ctx.stroke()
+      }
 
-      // Draw drag handles - larger and more visible
-      const handleWidth = 12
-      const handleHeight = 20
+      // Draw trim handles - larger and more visible
+      const handleWidth = 14
+      const handleHeight = 24
+      
+      // Ensure handles are always within canvas bounds
+      const startHandleX = Math.max(handleWidth / 2, Math.min(canvasWidth - handleWidth / 2, startPixel))
+      const endHandleX = Math.max(handleWidth / 2, Math.min(canvasWidth - handleWidth / 2, endPixel))
       
       // Start handle
       ctx.fillStyle = '#dc2626' // red-600
-      ctx.fillRect(startPixel - handleWidth / 2, waveformHeight - handleHeight, handleWidth, handleHeight)
+      ctx.fillRect(startHandleX - handleWidth / 2, waveformHeight - handleHeight, handleWidth, handleHeight)
       
       // Handle grip lines
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 1
       for (let i = 0; i < 3; i++) {
-        const gripX = startPixel - 3 + (i * 2)
+        const gripX = startHandleX - 3 + (i * 2)
         ctx.beginPath()
         ctx.moveTo(gripX, waveformHeight - handleHeight + 4)
         ctx.lineTo(gripX, waveformHeight - 4)
         ctx.stroke()
       }
       
-      // End handle
-      ctx.fillStyle = '#dc2626' // red-600
-      ctx.fillRect(endPixel - handleWidth / 2, waveformHeight - handleHeight, handleWidth, handleHeight)
-      
-      // Handle grip lines
-      for (let i = 0; i < 3; i++) {
-        const gripX = endPixel - 3 + (i * 2)
-        ctx.beginPath()
-        ctx.moveTo(gripX, waveformHeight - handleHeight + 4)
-        ctx.lineTo(gripX, waveformHeight - 4)
-        ctx.stroke()
+      // End handle (only draw if different from start handle)
+      if (Math.abs(endHandleX - startHandleX) > handleWidth) {
+        ctx.fillStyle = '#dc2626' // red-600
+        ctx.fillRect(endHandleX - handleWidth / 2, waveformHeight - handleHeight, handleWidth, handleHeight)
+        
+        // Handle grip lines
+        for (let i = 0; i < 3; i++) {
+          const gripX = endHandleX - 3 + (i * 2)
+          ctx.beginPath()
+          ctx.moveTo(gripX, waveformHeight - handleHeight + 4)
+          ctx.lineTo(gripX, waveformHeight - 4)
+          ctx.stroke()
+        }
+      } else {
+        // If handles overlap, draw a combined wider handle
+        ctx.fillStyle = '#dc2626' // red-600
+        const combinedWidth = handleWidth + 4
+        ctx.fillRect(startHandleX - combinedWidth / 2, waveformHeight - handleHeight, combinedWidth, handleHeight)
+        
+        // Draw text indicator for overlapped handles
+        ctx.fillStyle = '#ffffff'
+        ctx.font = '10px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('⟷', startHandleX, waveformHeight - handleHeight / 2 + 3)
       }
     }
 
@@ -304,7 +331,7 @@ export function Waveform({
       if (!readonly && trimPoints) {
         const startPixel = timeToPixel(trimPoints.startTime)
         const endPixel = timeToPixel(trimPoints.endTime)
-        const handleWidth = 12
+        const handleWidth = 14
         
         if (Math.abs(x - startPixel) <= handleWidth / 2 || Math.abs(x - endPixel) <= handleWidth / 2) {
           setCursorType('col-resize')
@@ -384,7 +411,7 @@ export function Waveform({
       if (trimPoints) {
         const startPixel = timeToPixel(trimPoints.startTime)
         const endPixel = timeToPixel(trimPoints.endTime)
-        const handleWidth = 12
+        const handleWidth = 14
 
         // Check if clicking on trim handles
         if (Math.abs(x - startPixel) <= handleWidth / 2) {
@@ -460,6 +487,38 @@ export function Waveform({
       {showControls && (
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
+            {/* Play/Pause Button */}
+            {onPlayPause && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onPlayPause}
+                  disabled={!canPlay}
+                  className={`${
+                    isPlaying 
+                      ? "text-red-600 hover:text-red-700 border-red-300" 
+                      : "text-green-600 hover:text-green-700 border-green-300"
+                  } ${!canPlay ? "opacity-50 cursor-not-allowed" : ""}`}
+                  title={
+                    !canPlay 
+                      ? "Audio playback not available" 
+                      : isPlaying 
+                        ? "Pause audio preview" 
+                        : "Play trimmed section"
+                  }
+                >
+                  {isPlaying ? (
+                    <Pause className="h-4 w-4" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                </Button>
+                <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+              </>
+            )}
+            
+            {/* Zoom Controls */}
             <Button
               variant="outline"
               size="sm"
@@ -491,6 +550,11 @@ export function Waveform({
           
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Duration: {Math.floor(waveformData.duration / 60)}:{(Math.floor(waveformData.duration % 60)).toString().padStart(2, '0')}
+            {trimPoints && (
+              <span className="ml-2 text-blue-600 dark:text-blue-400">
+                | Selection: {Math.floor((trimPoints.endTime - trimPoints.startTime) / 60)}:{(Math.floor((trimPoints.endTime - trimPoints.startTime) % 60)).toString().padStart(2, '0')}
+              </span>
+            )}
           </div>
         </div>
       )}

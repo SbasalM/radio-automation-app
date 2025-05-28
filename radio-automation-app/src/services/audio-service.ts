@@ -9,40 +9,165 @@ import type {
 } from '@/types/audio'
 
 class AudioService {
-  // Mock audio file analysis
+  // Audio file analysis - get real data from backend
   async analyzeAudioFile(filename: string, fileSize: number = 0): Promise<AudioFile> {
     console.log(`🎵 Analyzing audio file: ${filename}`)
     
-    // Simulate analysis delay
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000))
-    
-    // Generate realistic audio properties
-    const duration = 180 + Math.random() * 420 // 3-10 minutes
-    const sampleRate = Math.random() > 0.5 ? 44100 : 48000
-    const channels = Math.random() > 0.7 ? 1 : 2 // 30% mono, 70% stereo
-    const format = filename.toLowerCase().includes('.wav') ? 'wav' : 
-                   filename.toLowerCase().includes('.flac') ? 'flac' : 'mp3'
-    
-    const audioFile: AudioFile = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      filename,
-      duration,
-      sampleRate,
-      channels,
-      format,
-      bitRate: format === 'mp3' ? (128 + Math.random() * 192) : undefined,
-      fileSize: fileSize || Math.floor(duration * 128000 / 8), // Rough estimate
-      filePath: `/audio/${filename}`,
-      createdAt: new Date(),
-      lastModified: new Date()
+    try {
+      // First, try to get file info from backend including content-length
+      const headResponse = await fetch(`http://localhost:3001/api/audio/${filename}`, {
+        method: 'HEAD',
+        mode: 'cors',
+        credentials: 'omit'
+      })
+      
+      if (!headResponse.ok) {
+        throw new Error(`HTTP ${headResponse.status}: ${headResponse.statusText}`)
+      }
+      
+      console.log('✅ Backend audio endpoint accessible')
+      
+      // Get file size from response headers if not provided
+      const contentLength = headResponse.headers.get('content-length')
+      const actualFileSize = fileSize || (contentLength ? parseInt(contentLength) : 0)
+      
+      console.log(`📁 File size: ${actualFileSize} bytes`)
+      
+      // Try to get real metadata from backend
+      let realDuration = null
+      let realSampleRate = 44100
+      let realChannels = 2
+      let realFormat = 'wav'
+      
+      try {
+        console.log('🔍 Fetching real metadata from backend...')
+        const metadataResponse = await fetch(`http://localhost:3001/api/audio/metadata/${filename}`)
+        
+        if (metadataResponse.ok) {
+          const metadataResult = await metadataResponse.json()
+          if (metadataResult.success && metadataResult.metadata) {
+            realDuration = metadataResult.metadata.duration
+            realSampleRate = metadataResult.metadata.sampleRate || 44100
+            realChannels = metadataResult.metadata.channels || 2
+            realFormat = metadataResult.metadata.format || 'wav'
+            console.log(`✅ Real metadata: ${realDuration}s, ${realSampleRate}Hz, ${realChannels}ch, ${realFormat}`)
+          }
+        }
+      } catch (metadataError) {
+        console.warn('Could not fetch metadata from backend:', metadataError)
+      }
+      
+      // Use real duration if available, otherwise calculate from file size
+      let calculatedDuration = realDuration || 300 // Default fallback
+      
+      if (!realDuration) {
+        if (actualFileSize > 0) {
+          // For WAV files: rough calculation based on file size
+          // WAV at CD quality (44.1kHz, 16-bit, stereo) = ~176KB per second
+          const estimatedSeconds = actualFileSize / (44100 * 2 * 2) // Sample rate * channels * bytes per sample
+          calculatedDuration = Math.max(30, Math.min(3600, estimatedSeconds))
+          console.log(`📊 Calculated duration from file size: ${Math.round(calculatedDuration)}s`)
+        } else {
+          console.log('⚠️ Using default duration (no file size or metadata available)')
+        }
+      }
+      
+      // Create the audio file object with real or calculated data
+      const format = realFormat || (filename.toLowerCase().includes('.wav') ? 'wav' : 
+                     filename.toLowerCase().includes('.flac') ? 'flac' : 'mp3')
+      
+      const audioFile: AudioFile = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        filename,
+        duration: calculatedDuration,
+        sampleRate: realSampleRate,
+        channels: realChannels,
+        format,
+        bitRate: format === 'mp3' ? 128 : undefined,
+        fileSize: actualFileSize,
+        filePath: `http://localhost:3001/api/audio/${filename}`,
+        createdAt: new Date(),
+        lastModified: new Date()
+      }
+      
+      console.log(`✅ Audio analysis complete: ${Math.round(audioFile.duration)}s, ${audioFile.sampleRate}Hz, ${audioFile.channels}ch`)
+      return audioFile
+      
+    } catch (error) {
+      console.warn('Failed to access backend audio endpoint:', error)
+      
+      // Enhanced fallback for when backend isn't available
+      let fallbackDuration = 300
+      
+      if (fileSize > 0) {
+        // File size based estimation
+        const estimatedMinutes = fileSize / (10 * 1024 * 1024)
+        fallbackDuration = Math.max(30, Math.min(1800, estimatedMinutes * 60))
+      }
+      
+      const format = filename.toLowerCase().includes('.wav') ? 'wav' : 
+                     filename.toLowerCase().includes('.flac') ? 'flac' : 'mp3'
+      
+      const audioFile: AudioFile = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        filename,
+        duration: fallbackDuration,
+        sampleRate: 44100,
+        channels: 2,
+        format,
+        bitRate: format === 'mp3' ? 128 : undefined,
+        fileSize: fileSize || Math.floor(fallbackDuration * 128000 / 8),
+        filePath: `http://localhost:3001/api/audio/${filename}`,
+        createdAt: new Date(),
+        lastModified: new Date()
+      }
+      
+      console.log(`✅ Audio analysis complete (offline): ${Math.round(fallbackDuration)}s`)
+      return audioFile
     }
-    
-    console.log(`✅ Audio analysis complete: ${Math.round(duration)}s, ${sampleRate}Hz, ${channels}ch`)
-    return audioFile
   }
 
-  // Generate realistic waveform data
-  generateWaveformData(audioFile: AudioFile, pixelWidth: number = 800): WaveformData {
+  // Generate waveform data from backend
+  async generateWaveformData(audioFile: AudioFile, pixelWidth: number = 800): Promise<WaveformData> {
+    console.log(`🎵 Generating waveform for: ${audioFile.filename}, width: ${pixelWidth}`)
+    
+    try {
+      // Call backend waveform generation endpoint
+      const response = await fetch(`http://localhost:3001/api/audio/waveform/${audioFile.filename}?width=${pixelWidth}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Waveform API responded with status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      
+      if (!result.success || !result.waveformData) {
+        throw new Error('Invalid waveform response from backend')
+      }
+      
+      console.log(`✅ Real waveform generated: ${result.waveformData.peaks.length} points, duration: ${result.waveformData.duration}s`)
+      
+      // Use the real duration from the backend waveform data
+      return {
+        ...result.waveformData,
+        duration: result.waveformData.duration // Ensure we use the backend's duration
+      }
+      
+    } catch (error) {
+      console.warn('Failed to get real waveform from backend, using fallback:', error)
+      
+      // Fallback to local mock generation if backend fails
+      return this.generateFallbackWaveform(audioFile, pixelWidth)
+    }
+  }
+  
+  // Fallback waveform generation (moved from original generateWaveformData)
+  private generateFallbackWaveform(audioFile: AudioFile, pixelWidth: number = 800): WaveformData {
     const { duration, sampleRate, channels } = audioFile
     const samplesPerPixel = Math.floor((duration * sampleRate) / pixelWidth)
     
