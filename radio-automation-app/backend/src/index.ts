@@ -16,6 +16,9 @@ import multer from 'multer'
 // Load environment variables
 dotenv.config()
 
+// Increase max listeners to avoid warnings during development restarts
+process.setMaxListeners(15)
+
 const logger = createLogger()
 
 // Configure multer for file uploads
@@ -348,6 +351,12 @@ const gracefulShutdown = async (signal: string) => {
     await fileWatcherService.stop()
     logger.info('File watcher stopped')
     
+    // Remove all listeners to prevent memory leaks
+    process.removeAllListeners('SIGTERM')
+    process.removeAllListeners('SIGINT')
+    process.removeAllListeners('uncaughtException')
+    process.removeAllListeners('unhandledRejection')
+    
     process.exit(0)
   } catch (error) {
     logger.error('Error during shutdown:', error)
@@ -355,22 +364,29 @@ const gracefulShutdown = async (signal: string) => {
   }
 }
 
-// Increase max listeners to avoid warnings
-process.setMaxListeners(15)
+// Set up process event listeners only if they don't already exist
+if (process.listenerCount('SIGTERM') === 0) {
+  process.once('SIGTERM', () => gracefulShutdown('SIGTERM'))
+}
 
-process.once('SIGTERM', () => gracefulShutdown('SIGTERM'))
-process.once('SIGINT', () => gracefulShutdown('SIGINT'))
+if (process.listenerCount('SIGINT') === 0) {
+  process.once('SIGINT', () => gracefulShutdown('SIGINT'))
+}
 
-// Handle uncaught exceptions
-process.once('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error)
-  process.exit(1)
-})
+// Handle uncaught exceptions (only if no existing handler)
+if (process.listenerCount('uncaughtException') === 0) {
+  process.once('uncaughtException', (error) => {
+    logger.error('Uncaught Exception:', error)
+    process.exit(1)
+  })
+}
 
-process.once('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason)
-  process.exit(1)
-})
+if (process.listenerCount('unhandledRejection') === 0) {
+  process.once('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason)
+    process.exit(1)
+  })
+}
 
 // Start the server
 startServer() 

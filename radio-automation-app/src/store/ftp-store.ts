@@ -441,6 +441,49 @@ export const useFTPStore = create<FTPStore>()(
     }),
     {
       name: 'radio-automation-ftp',
+      // Add custom state transformation to handle Date objects properly
+      partialize: (state) => ({
+        profiles: state.profiles,
+        schedules: state.schedules,
+        downloadHistory: state.downloadHistory,
+        historySettings: state.historySettings,
+      }),
+      // Custom deserializer to convert date strings back to Date objects
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Convert date strings to Date objects for profiles
+          state.profiles = state.profiles.map(profile => ({
+            ...profile,
+            lastTested: profile.lastTested ? new Date(profile.lastTested) : undefined,
+            createdAt: new Date(profile.createdAt),
+            updatedAt: new Date(profile.updatedAt)
+          }))
+          
+          // Convert date strings to Date objects for schedules
+          state.schedules = state.schedules.map(schedule => ({
+            ...schedule,
+            lastRun: schedule.lastRun ? new Date(schedule.lastRun) : undefined,
+            nextRun: schedule.nextRun ? new Date(schedule.nextRun) : undefined,
+            createdAt: new Date(schedule.createdAt),
+            updatedAt: new Date(schedule.updatedAt)
+          }))
+          
+          // Convert date strings to Date objects for download history
+          state.downloadHistory = state.downloadHistory.map(history => ({
+            ...history,
+            fileModified: new Date(history.fileModified),
+            downloadedAt: new Date(history.downloadedAt)
+          }))
+          
+          // Convert date strings to Date objects for history settings
+          if (state.historySettings.lastExport) {
+            state.historySettings.lastExport = new Date(state.historySettings.lastExport)
+          }
+          if (state.historySettings.lastCleanup) {
+            state.historySettings.lastCleanup = new Date(state.historySettings.lastCleanup)
+          }
+        }
+      }
     }
   )
 ) 

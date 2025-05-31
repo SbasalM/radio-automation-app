@@ -163,9 +163,15 @@ export function isValidCronExpression(expression: string): boolean {
 }
 
 // Format date for display
-export function formatNextRun(date: Date): string {
+export function formatNextRun(date: Date | string): string {
+  // Convert string dates to Date objects (from localStorage serialization)
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) return 'Invalid date'
+  
   const now = new Date()
-  const diffMs = date.getTime() - now.getTime()
+  const diffMs = dateObj.getTime() - now.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
   const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
   const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))

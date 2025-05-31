@@ -16,7 +16,7 @@
       "autoProcessing": true,
       "id": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
       "createdAt": "2025-05-27T01:28:50.938Z",
-      "updatedAt": "2025-05-30T21:10:09.049Z",
+      "updatedAt": "2025-05-30T22:51:06.695Z",
       "metadataMapping": {
         "inputPatterns": [
           ""
@@ -79,7 +79,8 @@
       "enableNotifications": false,
       "notificationEmails": [],
       "alertOnErrors": true,
-      "alertOnMissingFiles": false
+      "alertOnMissingFiles": false,
+      "processExistingFiles": false
     }
   ],
   "queue": [
@@ -88,17 +89,17 @@
       "showId": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
       "status": "completed",
       "sourcePath": "C:\\Users\\enola\\OneDrive\\Archive\\Star Wars - The Hive\\AnswersInGenesis_100424.wav",
-      "id": "8f2daeae-df62-419d-b9d1-02172084d23d",
-      "addedAt": "2025-05-30T21:14:46.134Z",
+      "id": "df4ac42f-99c2-4ef8-8e33-08a3e8fac9d4",
+      "addedAt": "2025-05-31T13:24:32.178Z",
       "outputPath": "C:\\Users\\enola\\OneDrive\\Archive\\VerseCraft\\Short Story - The Letter Keeper\\Answers_in_Genesis_1.mp3",
-      "processedAt": "2025-05-30T21:14:46.762Z",
-      "processingTimeMs": 627
+      "processedAt": "2025-05-31T13:24:32.772Z",
+      "processingTimeMs": 593
     }
   ],
   "settings": {
     "version": "1.0.0",
     "watchInterval": 5000,
-    "lastBackup": "2025-05-30T21:14:46.762Z",
+    "lastBackup": "2025-05-31T13:24:32.772Z",
     "globalWatchDirectory": "Watch",
     "globalOutputDirectory": "Output"
   }

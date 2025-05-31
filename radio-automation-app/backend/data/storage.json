@@ -81,67 +81,6 @@
       "alertOnErrors": true,
       "alertOnMissingFiles": false,
       "processExistingFiles": false
-    },
-    {
-      "name": "Audio Test Show",
-      "description": "Test show to verify audio processing settings",
-      "enabled": true,
-      "filePatterns": [
-        {
-          "id": "test-pattern-1",
-          "pattern": "test_*.wav",
-          "type": "watch",
-          "watchPath": "C:\\Users\\enola\\OneDrive\\Archive\\VerseCraft"
-        }
-      ],
-      "outputDirectory": "C:\\Users\\enola\\OneDrive\\Archive\\VerseCraft\\Processed",
-      "autoProcessing": true,
-      "fileNamingRules": {
-        "outputPattern": "AudioTest_{YYYY}-{MM}-{DD}_{originalFilename}",
-        "dateFormat": "YYYY-MM-DD",
-        "caseConversion": "none",
-        "invalidCharacterHandling": "underscore"
-      },
-      "trimSettings": {
-        "startSeconds": 5,
-        "endSeconds": 30,
-        "fadeIn": true,
-        "fadeOut": true
-      },
-      "processingOptions": {
-        "normalize": true,
-        "addPromoTag": false,
-        "useGlobalSettings": false,
-        "audioSettings": {
-          "normalizationLevel": -16,
-          "autoGain": true,
-          "trimSilence": true,
-          "silenceThreshold": -50,
-          "silencePadding": 0.5,
-          "fadeInDuration": 1,
-          "fadeOutDuration": 2,
-          "outputFormat": "mp3",
-          "sampleRate": 44100,
-          "bitRate": 192,
-          "enableCompression": true,
-          "compressionRatio": 3,
-          "compressionThreshold": -12,
-          "enableLimiter": true,
-          "limiterThreshold": -3,
-          "enableEQ": true,
-          "lowFreqGain": -2,
-          "midFreqGain": 2,
-          "highFreqGain": 1,
-          "enableDeEsser": true,
-          "deEsserThreshold": -15,
-          "enableNoiseGate": true,
-          "noiseGateThreshold": -50
-        }
-      },
-      "id": "99906619-a9de-40a5-9cc9-2da15e614d58",
-      "createdAt": "2025-05-30T22:54:09.858Z",
-      "updatedAt": "2025-05-30T22:57:04.074Z",
-      "processExistingFiles": true
     }
   ],
   "queue": [
@@ -150,17 +89,17 @@
       "showId": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
       "status": "completed",
       "sourcePath": "C:\\Users\\enola\\OneDrive\\Archive\\Star Wars - The Hive\\AnswersInGenesis_100424.wav",
-      "id": "a6ff3bac-477d-49b9-817c-e7fb025ac43c",
-      "addedAt": "2025-05-31T01:59:16.829Z",
-      "outputPath": "C:\\Users\\enola\\OneDrive\\Archive\\VerseCraft\\Short Story - The Letter Keeper\\Answers_in_Genesis.mp3",
-      "processedAt": "2025-05-31T01:59:17.683Z",
-      "processingTimeMs": 853
+      "id": "df4ac42f-99c2-4ef8-8e33-08a3e8fac9d4",
+      "addedAt": "2025-05-31T13:24:32.178Z",
+      "outputPath": "C:\\Users\\enola\\OneDrive\\Archive\\VerseCraft\\Short Story - The Letter Keeper\\Answers_in_Genesis_1.mp3",
+      "processedAt": "2025-05-31T13:24:32.772Z",
+      "processingTimeMs": 593
     }
   ],
   "settings": {
     "version": "1.0.0",
     "watchInterval": 5000,
-    "lastBackup": "2025-05-31T01:59:17.683Z",
+    "lastBackup": "2025-05-31T13:24:32.772Z",
     "globalWatchDirectory": "Watch",
     "globalOutputDirectory": "Output"
   }

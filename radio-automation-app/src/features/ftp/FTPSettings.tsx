@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Plus, Server, Calendar, Edit, Trash2, TestTube, Play, Clock } from 'lucide-react'
+import { Plus, Server, Calendar, Edit, Trash2, TestTube, Play, Clock, Archive } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FTPProfileForm } from './FTPProfileForm'
 import { ScheduleForm } from './ScheduleForm'
+import { HistorySettingsForm } from './HistorySettingsForm'
 import { useFTPStore } from '@/store/ftp-store'
 import { useShowStore } from '@/store/show-store'
 import { ftpService } from '@/services/ftp-service'
@@ -49,7 +50,28 @@ export function FTPSettings() {
 
   const handleTestConnection = async (profile: FTPProfile) => {
     updateProfile(profile.id, { connectionStatus: 'testing' })
-    await ftpService.testConnection(profile)
+    
+    try {
+      const result = await ftpService.testConnection(profile)
+      
+      // Update profile connection status based on result
+      updateProfile(profile.id, {
+        connectionStatus: result.success ? 'connected' : 'error',
+        lastTested: new Date()
+      })
+      
+      if (result.success) {
+        console.log(`✅ Test successful: ${result.message}`)
+      } else {
+        console.warn(`⚠️ Test failed: ${result.message}`)
+      }
+    } catch (error) {
+      console.error('❌ Test connection error:', error)
+      updateProfile(profile.id, {
+        connectionStatus: 'error',
+        lastTested: new Date()
+      })
+    }
   }
 
   const handleAddSchedule = () => {
@@ -90,10 +112,17 @@ export function FTPSettings() {
     return profiles.find(p => p.id === profileId)
   }
 
-  const formatLastTested = (date?: Date) => {
+  const formatLastTested = (date?: Date | string) => {
     if (!date) return 'Never'
+    
+    // Convert string dates to Date objects (from localStorage serialization)
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) return 'Invalid date'
+    
     const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
+    const diffMs = now.getTime() - dateObj.getTime()
     const diffMinutes = Math.floor(diffMs / (1000 * 60))
     
     if (diffMinutes < 1) return 'Just now'
@@ -235,6 +264,13 @@ export function FTPSettings() {
                           </div>
                           <div className="text-sm text-gray-600 dark:text-gray-400">
                             {profile.enabled ? 'Enabled' : 'Disabled'}
+                            {(() => {
+                              const profileSchedules = schedules.filter(s => s.ftpProfileId === profile.id && s.enabled)
+                              if (profileSchedules.length > 0) {
+                                return ` • ${profileSchedules.length} active schedule${profileSchedules.length === 1 ? '' : 's'}`
+                              }
+                              return ''
+                            })()}
                           </div>
                         </td>
                         <td className="py-4 px-4">
@@ -364,6 +400,16 @@ export function FTPSettings() {
                         <td className="py-4 px-4">
                           <div className="text-sm text-gray-900 dark:text-gray-100">
                             {profile?.name || 'Unknown FTP'}
+                            {!profile && (
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
+                                Missing
+                              </span>
+                            )}
+                            {profile && !profile.enabled && (
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
+                                Disabled
+                              </span>
+                            )}
                           </div>
                           <div className="text-sm text-gray-600 dark:text-gray-400">
                             {show?.name || 'Unknown Show'}
@@ -432,6 +478,19 @@ export function FTPSettings() {
               </table>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Download History & Export Management Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Archive className="h-5 w-5" />
+            <span>Download History & Export Management</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <HistorySettingsForm />
         </CardContent>
       </Card>
 

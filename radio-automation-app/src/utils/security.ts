@@ -75,7 +75,12 @@ export function decryptPassword(encryptedPassword: string): string {
  * @returns True if password appears to be encrypted
  */
 export function isPasswordEncrypted(password: string): boolean {
-  // Encrypted passwords are base64 strings that don't contain common password characters
+  // CryptoJS encrypted passwords start with "U2FsdGVkX1" (base64 encoded "Salted__")
+  if (password.startsWith('U2FsdGVkX1')) {
+    return true
+  }
+  
+  // Fallback: check if it looks like a base64 encrypted string
   const base64Regex = /^[A-Za-z0-9+/=]+$/
   const hasCommonPasswordChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\?~`]/.test(password)
   

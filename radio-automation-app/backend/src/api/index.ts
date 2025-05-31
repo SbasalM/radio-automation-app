@@ -3,6 +3,7 @@ import showRoutes from './shows'
 import queueRoutes from './queue'
 import watchRoutes from './watch'
 import systemRoutes from './system'
+import ftpRoutes from './ftp'
 
 export function setupRoutes(app: Express): void {
   // Mount API routes
@@ -10,4 +11,5 @@ export function setupRoutes(app: Express): void {
   app.use('/api/queue', queueRoutes)
   app.use('/api/watch', watchRoutes) // Mount watch routes under /api/watch
   app.use('/api/system', systemRoutes) // Fix: mount system routes under /api/system instead of /api/status
+  app.use('/api/ftp', ftpRoutes) // Add FTP routes
 } 

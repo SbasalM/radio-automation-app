@@ -154,7 +154,19 @@ export function validateProductionConfig(): { valid: boolean; errors: string[] }
  * Get configuration based on current environment
  */
 export function getEnvironmentConfig(): FTPEnvironmentConfig {
-  const environment = import.meta.env.VITE_APP_ENV as 'development' | 'staging' | 'production' || 'development'
+  // Check multiple environment variables for better compatibility
+  const environment = (
+    import.meta.env.VITE_APP_ENV || 
+    import.meta.env.NODE_ENV || 
+    import.meta.env.MODE || 
+    'development'
+  ) as 'development' | 'staging' | 'production'
+  
+  // Allow disabling mock mode for real FTP testing in development
+  const forceRealConnections = import.meta.env.VITE_FORCE_REAL_FTP === 'true'
+  
+  console.log(`🔧 Environment detected: ${environment}`)
+  console.log(`🔧 Force real FTP connections: ${forceRealConnections}`)
   
   switch (environment) {
     case 'production':
@@ -167,11 +179,12 @@ export function getEnvironmentConfig(): FTPEnvironmentConfig {
         enableMockMode: false
       }
     default:
+      // Default to development mode with optional real connections
       return {
         ...PRODUCTION_ENVIRONMENT,
         environment: 'development',
         logLevel: 'debug',
-        enableMockMode: true,
+        enableMockMode: !forceRealConnections, // Disable mock mode if forcing real connections
         dataStoragePath: './data',
         tempDirectory: './temp'
       }
