@@ -196,4 +196,70 @@ export function replaceDatePatterns(pattern: string, date: Date = new Date()): s
     .replace(/{YYYY-MM-DD}/g, `${year}-${month}-${day}`)
     .replace(/{MM-DD-YYYY}/g, `${month}-${day}-${year}`)
     .replace(/{DD-MM-YYYY}/g, `${day}-${month}-${year}`)
+}
+
+// Format cron expression to human-readable text
+export function formatCronExpression(expression: string): string {
+  try {
+    const parts = expression.trim().split(/\s+/)
+    if (parts.length !== 5) return expression
+
+    const [minute, hour, day, month, dayOfWeek] = parts
+
+    // Common patterns
+    if (expression === '0 * * * *') return 'Every hour on the hour'
+    if (expression === '*/30 * * * *') return 'Every 30 minutes'
+    if (expression === '0 0 * * *') return 'Daily at midnight'
+    if (expression === '0 5 * * *') return 'Daily at 5:00 AM'
+    if (expression === '0 18 * * *') return 'Daily at 6:00 PM'
+    if (expression === '0 6 * * 1') return 'Every Monday at 6:00 AM'
+    if (expression === '0 5 * * 1-5') return 'Weekdays at 5:00 AM'
+
+    // Build description
+    let description = ''
+
+    // Minute
+    if (minute === '*') {
+      description += 'Every minute'
+    } else if (minute.includes('/')) {
+      const step = minute.split('/')[1]
+      description += `Every ${step} minutes`
+    } else {
+      description += `At minute ${minute}`
+    }
+
+    // Hour
+    if (hour !== '*') {
+      if (hour.includes('/')) {
+        const step = hour.split('/')[1]
+        description += `, every ${step} hours`
+      } else {
+        const hourNum = parseInt(hour)
+        const timeStr = hourNum === 0 ? '12:00 AM' : 
+                      hourNum < 12 ? `${hourNum}:00 AM` :
+                      hourNum === 12 ? '12:00 PM' :
+                      `${hourNum - 12}:00 PM`
+        description += ` at ${timeStr}`
+      }
+    }
+
+    // Day of week
+    if (dayOfWeek !== '*') {
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      if (dayOfWeek.includes('-')) {
+        const [start, end] = dayOfWeek.split('-').map(Number)
+        description += ` on ${days[start]} through ${days[end]}`
+      } else if (dayOfWeek.includes(',')) {
+        const dayNums = dayOfWeek.split(',').map(Number)
+        const dayNames = dayNums.map(num => days[num])
+        description += ` on ${dayNames.join(', ')}`
+      } else {
+        description += ` on ${days[parseInt(dayOfWeek)]}`
+      }
+    }
+
+    return description
+  } catch {
+    return expression
+  }
 } 

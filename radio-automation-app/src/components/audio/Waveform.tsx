@@ -69,6 +69,12 @@ export function Waveform({
     return (adjustedPixel / (canvasWidth * zoom)) * waveformData.duration
   }, [waveformData.duration, zoom, panOffset, getCanvasWidth])
 
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = Math.floor(seconds % 60)
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
   // Draw waveform
   const drawWaveform = useCallback(() => {
     const canvas = canvasRef.current
@@ -486,75 +492,66 @@ export function Waveform({
     <div className={`relative ${className}`}>
       {showControls && (
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center space-x-2">
-            {/* Play/Pause Button */}
-            {onPlayPause && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onPlayPause}
-                  disabled={!canPlay}
-                  className={`${
-                    isPlaying 
-                      ? "text-red-600 hover:text-red-700 border-red-300" 
-                      : "text-green-600 hover:text-green-700 border-green-300"
-                  } ${!canPlay ? "opacity-50 cursor-not-allowed" : ""}`}
-                  title={
-                    !canPlay 
-                      ? "Audio playback not available" 
-                      : isPlaying 
-                        ? "Pause audio preview" 
-                        : "Play trimmed section"
-                  }
-                >
-                  {isPlaying ? (
-                    <Pause className="h-4 w-4" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                </Button>
-                <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-              </>
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            {hoverTime !== null ? (
+              <span>Time: {formatTime(hoverTime)}</span>
+            ) : (
+              <span>Duration: {formatTime(waveformData.duration)}</span>
             )}
-            
-            {/* Zoom Controls */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleZoomOut}
-              disabled={zoom <= minZoom}
-            >
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[60px] text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleZoomIn}
-              disabled={zoom >= maxZoom}
-            >
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleZoomReset}
-              disabled={zoom === 1}
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
           </div>
           
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Duration: {Math.floor(waveformData.duration / 60)}:{(Math.floor(waveformData.duration % 60)).toString().padStart(2, '0')}
-            {trimPoints && (
-              <span className="ml-2 text-blue-600 dark:text-blue-400">
-                | Selection: {Math.floor((trimPoints.endTime - trimPoints.startTime) / 60)}:{(Math.floor((trimPoints.endTime - trimPoints.startTime) % 60)).toString().padStart(2, '0')}
+          {/* Play controls */}
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onPlayPause?.()
+              }}
+              disabled={!canPlay}
+              className="h-8 w-8 p-0"
+            >
+              {isPlaying ? (
+                <Pause className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+            </Button>
+            
+            {/* Zoom controls */}
+            <div className="flex items-center space-x-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setZoom(Math.max(1, zoom * 0.8))
+                }}
+                className="h-6 w-6 p-0 text-xs"
+                disabled={zoom <= 1}
+              >
+                -
+              </Button>
+              <span className="text-xs text-gray-500 dark:text-gray-400 min-w-[3rem] text-center">
+                {Math.round(zoom * 100)}%
               </span>
-            )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setZoom(Math.min(5, zoom * 1.25))
+                }}
+                className="h-6 w-6 p-0 text-xs"
+                disabled={zoom >= 5}
+              >
+                +
+              </Button>
+            </div>
           </div>
         </div>
       )}

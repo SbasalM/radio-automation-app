@@ -1,0 +1,167 @@
+{
+  "shows": [
+    {
+      "name": "Answers in Genesis",
+      "description": "A short radio program about the worldviews and the creation of the world.",
+      "enabled": true,
+      "filePatterns": [
+        {
+          "id": "pattern_0",
+          "pattern": "AnswersInGenesis_{MM}{DD}{YY}.wav",
+          "type": "watch",
+          "watchPath": "C:\\Users\\enola\\OneDrive\\Archive\\Star Wars - The Hive"
+        }
+      ],
+      "outputDirectory": "C:\\Users\\enola\\OneDrive\\Archive\\VerseCraft\\Short Story - The Letter Keeper",
+      "autoProcessing": true,
+      "id": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
+      "createdAt": "2025-05-27T01:28:50.938Z",
+      "updatedAt": "2025-05-30T22:51:06.695Z",
+      "metadataMapping": {
+        "inputPatterns": [
+          ""
+        ],
+        "extractionRules": [],
+        "outputMetadata": {
+          "title": "AIG-{YYYY}-{MM}-{DD}",
+          "artist": "Ken Ham",
+          "album": "Answers with Ken Ham",
+          "genre": "Short Programs",
+          "customFields": {},
+          "year": "{YYYY}",
+          "comment": "Test Comment"
+        }
+      },
+      "fileNamingRules": {
+        "outputPattern": "{showName}",
+        "dateFormat": "YYYY-MM-DD",
+        "caseConversion": "none",
+        "invalidCharacterHandling": "underscore"
+      },
+      "trimSettings": {
+        "startSeconds": 17.5,
+        "endSeconds": 47.3,
+        "fadeIn": false,
+        "fadeOut": false
+      },
+      "processingOptions": {
+        "normalize": true,
+        "addPromoTag": false,
+        "useGlobalSettings": false,
+        "audioSettings": {
+          "normalizationLevel": -16,
+          "autoGain": true,
+          "trimSilence": false,
+          "silenceThreshold": -50,
+          "silencePadding": 0.5,
+          "fadeInDuration": 0,
+          "fadeOutDuration": 0,
+          "outputFormat": "mp3",
+          "sampleRate": 44100,
+          "bitRate": 192,
+          "enableCompression": false,
+          "compressionRatio": 3,
+          "compressionThreshold": -12,
+          "enableLimiter": false,
+          "limiterThreshold": -3,
+          "enableEQ": false,
+          "lowFreqGain": 0,
+          "midFreqGain": 0,
+          "highFreqGain": 0,
+          "enableDeEsser": false,
+          "deEsserThreshold": -20,
+          "enableNoiseGate": false,
+          "noiseGateThreshold": -60
+        }
+      },
+      "processOnSchedule": false,
+      "schedulePattern": "",
+      "enableNotifications": false,
+      "notificationEmails": [],
+      "alertOnErrors": true,
+      "alertOnMissingFiles": false,
+      "processExistingFiles": false
+    },
+    {
+      "name": "Audio Test Show",
+      "description": "Test show to verify audio processing settings",
+      "enabled": true,
+      "filePatterns": [
+        {
+          "id": "test-pattern-1",
+          "pattern": "test_*.wav",
+          "type": "watch",
+          "watchPath": "C:\\Users\\enola\\OneDrive\\Archive\\VerseCraft"
+        }
+      ],
+      "outputDirectory": "C:\\Users\\enola\\OneDrive\\Archive\\VerseCraft\\Processed",
+      "autoProcessing": true,
+      "fileNamingRules": {
+        "outputPattern": "AudioTest_{YYYY}-{MM}-{DD}_{originalFilename}",
+        "dateFormat": "YYYY-MM-DD",
+        "caseConversion": "none",
+        "invalidCharacterHandling": "underscore"
+      },
+      "trimSettings": {
+        "startSeconds": 5,
+        "endSeconds": 30,
+        "fadeIn": true,
+        "fadeOut": true
+      },
+      "processingOptions": {
+        "normalize": true,
+        "addPromoTag": false,
+        "useGlobalSettings": false,
+        "audioSettings": {
+          "normalizationLevel": -16,
+          "autoGain": true,
+          "trimSilence": true,
+          "silenceThreshold": -50,
+          "silencePadding": 0.5,
+          "fadeInDuration": 1,
+          "fadeOutDuration": 2,
+          "outputFormat": "mp3",
+          "sampleRate": 44100,
+          "bitRate": 192,
+          "enableCompression": true,
+          "compressionRatio": 3,
+          "compressionThreshold": -12,
+          "enableLimiter": true,
+          "limiterThreshold": -3,
+          "enableEQ": true,
+          "lowFreqGain": -2,
+          "midFreqGain": 2,
+          "highFreqGain": 1,
+          "enableDeEsser": true,
+          "deEsserThreshold": -15,
+          "enableNoiseGate": true,
+          "noiseGateThreshold": -50
+        }
+      },
+      "id": "99906619-a9de-40a5-9cc9-2da15e614d58",
+      "createdAt": "2025-05-30T22:54:09.858Z",
+      "updatedAt": "2025-05-30T22:57:04.074Z",
+      "processExistingFiles": true
+    }
+  ],
+  "queue": [
+    {
+      "filename": "AnswersInGenesis_100424.wav",
+      "showId": "6f86e86c-e6e6-414c-ae4d-b0de11439653",
+      "status": "completed",
+      "sourcePath": "C:\\Users\\enola\\OneDrive\\Archive\\Star Wars - The Hive\\AnswersInGenesis_100424.wav",
+      "id": "1d94d61f-65fb-47e9-a737-9c897999bb68",
+      "addedAt": "2025-05-30T22:51:50.037Z",
+      "outputPath": "C:\\Users\\enola\\OneDrive\\Archive\\VerseCraft\\Short Story - The Letter Keeper\\Answers_in_Genesis.mp3",
+      "processedAt": "2025-05-30T22:51:50.647Z",
+      "processingTimeMs": 606
+    }
+  ],
+  "settings": {
+    "version": "1.0.0",
+    "watchInterval": 5000,
+    "lastBackup": "2025-05-30T22:57:04.074Z",
+    "globalWatchDirectory": "Watch",
+    "globalOutputDirectory": "Output"
+  }
+}

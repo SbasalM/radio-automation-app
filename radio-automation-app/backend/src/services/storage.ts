@@ -20,6 +20,7 @@ export interface ShowProfile {
   }>
   outputDirectory: string
   autoProcessing: boolean
+  processExistingFiles?: boolean // Whether to process existing files in watch folders or only new ones
   createdAt: Date
   updatedAt: Date
   // Extended settings
@@ -89,14 +90,15 @@ export class StorageService {
   private constructor() {
     this.storagePath = process.env.STORAGE_PATH || './data'
     this.dataFilePath = path.join(this.storagePath, 'storage.json')
+    
     this.data = {
       shows: [],
       queue: [],
       settings: {
         version: '1.0.0',
         watchInterval: parseInt(process.env.WATCH_INTERVAL || '5000'),
-        globalWatchDirectory: process.env.GLOBAL_WATCH_DIR || path.join(process.cwd(), 'watch'),
-        globalOutputDirectory: process.env.GLOBAL_OUTPUT_DIR || path.join(process.cwd(), 'processed')
+        globalWatchDirectory: process.env.GLOBAL_WATCH_DIR || 'Watch',
+        globalOutputDirectory: process.env.GLOBAL_OUTPUT_DIR || 'Output'
       }
     }
   }
@@ -170,17 +172,17 @@ export class StorageService {
       this.data.settings = {
         version: '1.0.0',
         watchInterval: 5000,
-        globalWatchDirectory: process.env.GLOBAL_WATCH_DIR || path.join(process.cwd(), 'watch'),
-        globalOutputDirectory: process.env.GLOBAL_OUTPUT_DIR || path.join(process.cwd(), 'processed')
+        globalWatchDirectory: process.env.GLOBAL_WATCH_DIR || 'Watch',
+        globalOutputDirectory: process.env.GLOBAL_OUTPUT_DIR || 'Output'
       }
     }
     
     // Add global directories if missing
     if (!this.data.settings.globalWatchDirectory) {
-      this.data.settings.globalWatchDirectory = process.env.GLOBAL_WATCH_DIR || path.join(process.cwd(), 'watch')
+      this.data.settings.globalWatchDirectory = process.env.GLOBAL_WATCH_DIR || 'Watch'
     }
     if (!this.data.settings.globalOutputDirectory) {
-      this.data.settings.globalOutputDirectory = process.env.GLOBAL_OUTPUT_DIR || path.join(process.cwd(), 'processed')
+      this.data.settings.globalOutputDirectory = process.env.GLOBAL_OUTPUT_DIR || 'Output'
     }
   }
 

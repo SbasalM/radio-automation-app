@@ -115,15 +115,55 @@ export class FileWatcherService {
         return
       }
 
-      // Get watch directories (per-pattern or global fallback)
+      // Get watch directories (per-pattern or global fallback) with proper path resolution
       const settings = await this.storageService.getSettings()
-      const globalWatchDir = settings.globalWatchDirectory || path.join(process.cwd(), 'watch')
+      // Calculate workspace root - process.cwd() is backend directory, go up one level to radio-automation-app
+      const backendDir = process.cwd()
+      const workspaceRoot = path.resolve(backendDir, '..')
+      
+      // Resolve global watch directory
+      let globalWatchDir: string
+      if (settings.globalWatchDirectory) {
+        if (path.isAbsolute(settings.globalWatchDirectory)) {
+          globalWatchDir = settings.globalWatchDirectory
+        } else {
+          globalWatchDir = path.resolve(workspaceRoot, settings.globalWatchDirectory)
+        }
+      } else {
+        globalWatchDir = path.join(workspaceRoot, 'Watch')
+      }
+      
+      logger.info(`DEBUG: process.cwd() = ${process.cwd()}`)
+      logger.info(`DEBUG: backendDir = ${backendDir}`)
+      logger.info(`DEBUG: workspaceRoot = ${workspaceRoot}`)
+      logger.info(`DEBUG: globalWatchDir = ${globalWatchDir}`)
       
       // Collect unique watch directories
       const watchDirectories = new Set<string>()
       
       for (const pattern of watchPatterns) {
-        const watchDir = pattern.watchPath || globalWatchDir
+        let watchDir: string
+        
+        if (pattern.watchPath) {
+          // User specified a watch path - resolve it properly
+          // Clean the path by removing surrounding quotes if present
+          const cleanedPath = pattern.watchPath.trim().replace(/^["']|["']$/g, '')
+          
+          if (path.isAbsolute(cleanedPath)) {
+            // Already absolute - use as-is
+            watchDir = cleanedPath
+          } else {
+            // Relative path - resolve relative to workspace root
+            watchDir = path.resolve(workspaceRoot, cleanedPath)
+            logger.info(`DEBUG: pattern.watchPath = ${pattern.watchPath}`)
+            logger.info(`DEBUG: cleanedPath = ${cleanedPath}`)
+            logger.info(`DEBUG: resolved watchDir = ${watchDir}`)
+          }
+        } else {
+          // Fall back to global setting
+          watchDir = globalWatchDir
+        }
+        
         watchDirectories.add(watchDir)
         
         // Ensure watch directory exists
@@ -135,57 +175,71 @@ export class FileWatcherService {
         }
       }
 
-      // Ensure output directory exists
-      await fs.ensureDir(show.outputDirectory)
+      // Ensure output directory exists with proper path resolution
+      let outputDir: string
+      if (show.outputDirectory) {
+        // Clean the path by removing surrounding quotes if present
+        const cleanedOutputPath = show.outputDirectory.trim().replace(/^["']|["']$/g, '')
+        
+        if (path.isAbsolute(cleanedOutputPath)) {
+          // Already absolute - use as-is
+          outputDir = cleanedOutputPath
+        } else {
+          // Relative path - resolve relative to workspace root
+          outputDir = path.resolve(workspaceRoot, cleanedOutputPath)
+          logger.info(`DEBUG: show.outputDirectory = ${show.outputDirectory}`)
+          logger.info(`DEBUG: cleanedOutputPath = ${cleanedOutputPath}`)
+          logger.info(`DEBUG: resolved outputDir = ${outputDir}`)
+        }
+      } else {
+        // Fall back to global default
+        const globalOutputDir = settings.globalOutputDirectory
+        if (globalOutputDir) {
+          if (path.isAbsolute(globalOutputDir)) {
+            outputDir = globalOutputDir
+          } else {
+            outputDir = path.resolve(workspaceRoot, globalOutputDir)
+          }
+        } else {
+          outputDir = path.join(workspaceRoot, 'Output')
+        }
+        logger.info(`DEBUG: Using fallback outputDir = ${outputDir}`)
+      }
+      
+      await fs.ensureDir(outputDir)
 
-      // Create watcher for directories (not patterns!)
-      const watcher = chokidar.watch(Array.from(watchDirectories), {
-        ignored: /(^|[\/\\])\../, // ignore dotfiles
-        persistent: true,
-        ignoreInitial: true, // Don't process existing files on startup to avoid duplicates
-        awaitWriteFinish: {
-          stabilityThreshold: 1000, // Reduced from 2000ms
-          pollInterval: 100
-        },
-        usePolling: false, // Use native OS events for better real-time detection
-        interval: 100, // Polling interval if usePolling is true
-        binaryInterval: 300,
-        alwaysStat: false,
-        depth: undefined, // Watch subdirectories
-        followSymlinks: true,
-        atomic: true // Don't emit events on atomic writes until complete
-      })
+      // Set up file watcher for each directory
+      for (const watchDir of watchDirectories) {
+        const watcher = chokidar.watch(watchDir, {
+          ignored: /^\./, // ignore hidden files
+          persistent: true,
+          ignoreInitial: true // Don't trigger on existing files during startup
+        })
 
-      // Set up event handlers
-      watcher
-        .on('add', async (filePath) => {
+        watcher.on('add', async (filePath) => {
+          logger.info(`File added: ${filePath}`)
           await this.handleFileDetected(filePath, show)
         })
-        .on('change', async (filePath) => {
-          logger.debug(`File changed: ${filePath}`)
-          // Could handle file updates here if needed
-        })
-        .on('unlink', (filePath) => {
-          logger.debug(`File removed: ${filePath}`)
-        })
-        .on('error', (error) => {
-          logger.error(`Watcher error for show ${show.name}:`, error)
-        })
-        .on('ready', async () => {
-          const patternList = watchPatterns.map(p => p.pattern).join(', ')
-          const dirList = Array.from(watchDirectories).join(', ')
-          logger.info(`Started watching ${show.name}: patterns [${patternList}] in directories [${dirList}]`)
-          
-          // Scan for existing files since we set ignoreInitial: true
-          await this.scanExistingFiles(show, Array.from(watchDirectories))
+
+        watcher.on('error', (error) => {
+          logger.error(`Watcher error for ${watchDir}:`, error)
         })
 
-      this.state.watchers.set(showId, watcher)
+        this.state.watchers.set(`${showId}-${watchDir}`, watcher)
+        logger.info(`Started watching directory: ${watchDir} for show: ${show.name}`)
+      }
+
+      // Scan for existing files only if the setting is enabled
+      if (show.processExistingFiles !== false) { // Default to true for backward compatibility
+        await this.scanExistingFiles(show, Array.from(watchDirectories))
+      } else {
+        logger.info(`Skipping existing files scan for show: ${show.name} (processExistingFiles is disabled)`)
+      }
+
       this.state.activeShows.add(showId)
-
+      logger.info(`Successfully started watching show: ${show.name}`)
     } catch (error) {
       logger.error(`Failed to start watching show ${showId}:`, error)
-      throw error
     }
   }
 

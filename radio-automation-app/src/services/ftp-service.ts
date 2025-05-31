@@ -2,138 +2,288 @@ import { useFileQueueStore } from '@/store/file-queue-store'
 import { useFTPStore } from '@/store/ftp-store'
 import { FileStatus } from '@/types/file'
 import { replaceDatePatterns } from '@/utils/cron-helper'
+import { getEnvironmentConfig } from '@/config/production.config'
+import { logSecurityEvent } from '@/utils/security'
+import { ftpService as productionFTPService } from './ftp-client'
 import type { FTPProfile, FTPFile, FTPDownloadResult } from '@/types/ftp'
 
 class FTPService {
-  // Mock file listings for different FTP servers
+  private config = getEnvironmentConfig()
+  
+  // Mock file listings for development/testing (environment-aware)
   private mockFileLists: Record<string, FTPFile[]> = {
-    'ftp.station.com': [
+    'test.example.com': [
       {
-        name: 'MorningShow_2024-05-25.mp3',
+        name: `test_${new Date().toISOString().split('T')[0]}.mp3`,
         size: 15678934,
         modifiedDate: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        path: '/shows/MorningShow_2024-05-25.mp3'
+        path: `/test/test_${new Date().toISOString().split('T')[0]}.mp3`
       },
       {
-        name: 'MorningShow_2024-05-24.mp3',
+        name: `test_${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]}.mp3`,
         size: 14523876,
         modifiedDate: new Date(Date.now() - 26 * 60 * 60 * 1000),
-        path: '/shows/MorningShow_2024-05-24.mp3'
-      },
-      {
-        name: 'Afternoon_Special.wav',
-        size: 28934567,
-        modifiedDate: new Date(Date.now() - 4 * 60 * 60 * 1000),
-        path: '/shows/Afternoon_Special.wav'
+        path: `/test/test_${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]}.mp3`
       }
     ],
-    'archive.news.com': [
+    'sftp.example.com': [
       {
-        name: 'News_Evening_2024-05-25.wav',
+        name: `sftp_test_${new Date().toISOString().split('T')[0]}.wav`,
         size: 18234567,
         modifiedDate: new Date(Date.now() - 1 * 60 * 60 * 1000),
-        path: '/archive/daily/News_Evening_2024-05-25.wav'
-      },
-      {
-        name: 'News_Evening_2024-05-24.wav',
-        size: 17890234,
-        modifiedDate: new Date(Date.now() - 25 * 60 * 60 * 1000),
-        path: '/archive/daily/News_Evening_2024-05-24.wav'
-      },
-      {
-        name: 'Breaking_News_Alert.mp3',
-        size: 5467890,
-        modifiedDate: new Date(Date.now() - 3 * 60 * 60 * 1000),
-        path: '/archive/daily/Breaking_News_Alert.mp3'
-      }
-    ],
-    'sports.media.com': [
-      {
-        name: 'Sports_Weekend_2024-05-20.mp3',
-        size: 22345678,
-        modifiedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-        path: '/sports/weekly/Sports_Weekend_2024-05-20.mp3'
-      },
-      {
-        name: 'Sports_Highlights.wav',
-        size: 19876543,
-        modifiedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        path: '/sports/weekly/Sports_Highlights.wav'
+        path: `/sftp/test/sftp_test_${new Date().toISOString().split('T')[0]}.wav`
       }
     ]
   }
 
   async testConnection(profile: FTPProfile): Promise<boolean> {
-    console.log(`🔗 Testing connection to ${profile.host}:${profile.port}...`)
+    logSecurityEvent('FTP connection test initiated', {
+      profileId: profile.id,
+      host: profile.host,
+      protocol: profile.protocol,
+      environment: this.config.environment
+    })
     
-    // Simulate connection test delay
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000))
+    if (this.config.enableMockMode) {
+      // Development mode with mock implementation
+      return this.testConnectionMock(profile)
+    } else {
+      // Production mode with real FTP client
+      return productionFTPService.testConnection(profile)
+    }
+  }
+
+  async listFiles(profile: FTPProfile, pattern?: string): Promise<FTPFile[]> {
+    logSecurityEvent('FTP file listing initiated', {
+      profileId: profile.id,
+      host: profile.host,
+      pattern,
+      environment: this.config.environment
+    })
     
-    // Mock connection success/failure (95% success rate)
-    const success = Math.random() > 0.05
+    if (this.config.enableMockMode) {
+      // Development mode with mock implementation
+      return this.listFilesMock(profile, pattern)
+    } else {
+      // Production mode with real FTP client
+      return productionFTPService.listFiles(profile, pattern)
+    }
+  }
+
+  async downloadFile(profile: FTPProfile, filename: string, showId: string): Promise<boolean> {
+    logSecurityEvent('FTP file download initiated', {
+      profileId: profile.id,
+      host: profile.host,
+      filename,
+      showId,
+      environment: this.config.environment
+    })
+    
+    if (this.config.enableMockMode) {
+      // Development mode with mock implementation
+      return this.downloadFileMock(profile, filename, showId)
+    } else {
+      // Production mode with real FTP client
+      const localPath = `${this.config.tempDirectory}/${filename}`
+      const success = await productionFTPService.downloadFile(profile, filename, localPath)
+      
+      if (success) {
+        // Add downloaded file to the file queue
+        const { addFile } = useFileQueueStore.getState()
+        addFile({
+          filename,
+          showId,
+          status: FileStatus.PENDING,
+          sourcePath: `${profile.basePath}/${filename}`,
+          outputPath: localPath
+        })
+      }
+      
+      return success
+    }
+  }
+
+  async runScheduledDownload(scheduleId: string): Promise<FTPDownloadResult> {
+    const { getSchedule, getProfile, addDownloadHistory } = useFTPStore.getState()
+    
+    const schedule = getSchedule(scheduleId)
+    if (!schedule) {
+      throw new Error(`Schedule not found: ${scheduleId}`)
+    }
+    
+    const profile = getProfile(schedule.ftpProfileId)
+    if (!profile) {
+      throw new Error(`Profile not found: ${schedule.ftpProfileId}`)
+    }
+    
+    logSecurityEvent('Scheduled FTP download started', {
+      scheduleId,
+      profileId: profile.id,
+      downloadMode: schedule.downloadMode,
+      maxFiles: schedule.maxFilesPerRun,
+      environment: this.config.environment
+    })
+    
+    if (this.config.enableMockMode) {
+      // Development mode with mock implementation
+      return this.runScheduledDownloadMock(schedule, profile)
+    } else {
+      // Production mode with real FTP client
+      const result = await productionFTPService.executeScheduledDownload(
+        profile,
+        schedule.filePattern,
+        schedule.downloadMode,
+        schedule.maxFilesPerRun,
+        this.config.tempDirectory
+      )
+      
+      // Track download history if enabled
+      if (schedule.trackDownloadHistory) {
+        result.filesDownloaded.forEach(filename => {
+          addDownloadHistory({
+            scheduleId,
+            filename,
+            filePath: `${profile.basePath}/${filename}`,
+            fileSize: 0, // Would need to get from file listing
+            fileModified: new Date(),
+            downloadedAt: result.downloadedAt,
+            successful: true
+          })
+        })
+        
+        result.filesSkipped.forEach(filename => {
+          addDownloadHistory({
+            scheduleId,
+            filename,
+            filePath: `${profile.basePath}/${filename}`,
+            fileSize: 0,
+            fileModified: new Date(),
+            downloadedAt: result.downloadedAt,
+            successful: false
+          })
+        })
+      }
+      
+      return result
+    }
+  }
+
+  async executeScheduleNow(scheduleId: string): Promise<FTPDownloadResult> {
+    logSecurityEvent('Manual schedule execution initiated', {
+      scheduleId,
+      environment: this.config.environment
+    })
+    
+    if (this.config.enableMockMode) {
+      // Development mode with mock implementation
+      const { getSchedule, getProfile } = useFTPStore.getState()
+      const schedule = getSchedule(scheduleId)
+      const profile = schedule ? getProfile(schedule.ftpProfileId) : null
+      
+      if (!schedule || !profile) {
+        throw new Error(`Schedule or profile not found for ID: ${scheduleId}`)
+      }
+      
+      return this.runScheduledDownloadMock(schedule, profile)
+    } else {
+      // Production mode with real FTP client
+      return productionFTPService.executeScheduleNow(scheduleId)
+    }
+  }
+
+  getConnectionStatusDisplay(status?: 'connected' | 'disconnected' | 'testing' | 'error'): { color: string; text: string } {
+    if (this.config.enableMockMode) {
+      // Development mode with mock implementation
+      return productionFTPService.getConnectionStatusDisplay(status)
+    } else {
+      // Production mode with real FTP client
+      return productionFTPService.getConnectionStatusDisplay(status)
+    }
+  }
+
+  // Mock implementations for development/testing
+  private async testConnectionMock(profile: FTPProfile): Promise<boolean> {
+    console.log(`🔗 [MOCK] Testing connection to ${profile.host}:${profile.port}`)
+    
+    // Simulate connection time
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Higher success rate for test servers
+    const success = profile.host.includes('test') || profile.host.includes('example') ? 
+      Math.random() > 0.1 : Math.random() > 0.3
     
     if (success) {
-      console.log(`✅ Successfully connected to ${profile.host}`)
-      // Update profile status
+      console.log(`✅ [MOCK] Connected to ${profile.host}`)
+      
+      // Update profile connection status
       const { updateProfile } = useFTPStore.getState()
       updateProfile(profile.id, {
         connectionStatus: 'connected',
         lastTested: new Date()
       })
-      return true
     } else {
-      console.log(`❌ Failed to connect to ${profile.host}`)
+      console.log(`❌ [MOCK] Failed to connect to ${profile.host}`)
+      
+      // Update profile connection status
       const { updateProfile } = useFTPStore.getState()
       updateProfile(profile.id, {
         connectionStatus: 'error',
         lastTested: new Date()
       })
-      return false
     }
+    
+    return success
   }
 
-  async listFiles(profile: FTPProfile, pattern?: string): Promise<FTPFile[]> {
-    console.log(`📁 Listing files from ${profile.host}${profile.basePath}`)
+  private async listFilesMock(profile: FTPProfile, pattern?: string): Promise<FTPFile[]> {
+    console.log(`📋 [MOCK] Listing files from ${profile.host}${profile.basePath}`)
     
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000))
+    // Simulate listing time
+    await new Promise(resolve => setTimeout(resolve, 500))
     
-    const files = this.mockFileLists[profile.host] || []
+    const mockFiles = this.mockFileLists[profile.host] || []
     
     if (!pattern) {
-      return files
+      return mockFiles
     }
 
-    // Replace date patterns in the search pattern
-    const resolvedPattern = replaceDatePatterns(pattern)
+    // Enhanced pattern matching with support for current-day filtering
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0] // YYYY-MM-DD format
     
-    // Simple pattern matching (convert * to regex)
-    const regexPattern = resolvedPattern
-      .replace(/\./g, '\\.')
+    // Replace date patterns in the pattern
+    const expandedPattern = replaceDatePatterns(pattern)
+    
+    // Convert glob pattern to regex
+    const regexPattern = expandedPattern
       .replace(/\*/g, '.*')
+      .replace(/\?/g, '.')
+      .replace(/\{([^}]+)\}/g, '($1)')
     
     const regex = new RegExp(`^${regexPattern}$`, 'i')
     
-    const matchedFiles = files.filter(file => regex.test(file.name))
-    console.log(`Found ${matchedFiles.length} files matching pattern: ${resolvedPattern}`)
-    
-    return matchedFiles
+    return mockFiles.filter(file => {
+      // Basic pattern matching
+      if (!regex.test(file.name)) return false
+      
+      return true
+    })
   }
 
-  async downloadFile(profile: FTPProfile, filename: string, showId: string): Promise<boolean> {
-    console.log(`⬇️ Downloading ${filename} from ${profile.host}`)
+  private async downloadFileMock(profile: FTPProfile, filename: string, showId: string): Promise<boolean> {
+    console.log(`⬇️ [MOCK] Downloading ${filename} from ${profile.host}`)
     
     // Simulate download time based on file size
     const mockFile = this.mockFileLists[profile.host]?.find(f => f.name === filename)
-    const downloadTime = mockFile ? Math.min(mockFile.size / 1000000, 10000) : 3000 // Max 10 seconds
+    const downloadTime = mockFile ? Math.min(mockFile.size / 2000000, 3000) : 1000 // Max 3 seconds
     
     await new Promise(resolve => setTimeout(resolve, downloadTime))
     
-    // 90% success rate for downloads
-    const success = Math.random() > 0.1
+    // 95% success rate in development
+    const success = Math.random() > 0.05
     
     if (success) {
-      console.log(`✅ Successfully downloaded ${filename}`)
+      console.log(`✅ [MOCK] Successfully downloaded ${filename}`)
       
       // Add downloaded file to the file queue
       const { addFile } = useFileQueueStore.getState()
@@ -142,146 +292,179 @@ class FTPService {
         showId,
         status: FileStatus.PENDING,
         sourcePath: `${profile.basePath}/${filename}`,
-        outputPath: undefined
+        outputPath: `${this.config.tempDirectory}/${filename}`
       })
       
       return true
     } else {
-      console.log(`❌ Failed to download ${filename}`)
+      console.log(`❌ [MOCK] Failed to download ${filename}`)
       return false
     }
   }
 
-  async downloadFilesForSchedule(scheduleId: string): Promise<FTPDownloadResult> {
-    const { getSchedule, getProfile } = useFTPStore.getState()
+  private async runScheduledDownloadMock(schedule: any, profile: FTPProfile): Promise<FTPDownloadResult> {
+    console.log(`🚀 [MOCK] Running scheduled download: ${schedule.name}`)
     
-    const schedule = getSchedule(scheduleId)
-    if (!schedule) {
-      return {
-        success: false,
-        filesDownloaded: [],
-        error: 'Schedule not found',
-        downloadedAt: new Date()
-      }
+    const result: FTPDownloadResult = {
+      success: false,
+      filesDownloaded: [],
+      filesSkipped: [],
+      totalFilesFound: 0,
+      downloadedAt: new Date(),
+      scheduleId: schedule.id,
+      downloadMode: schedule.downloadMode
     }
-
-    const profile = getProfile(schedule.ftpProfileId)
-    if (!profile) {
-      return {
-        success: false,
-        filesDownloaded: [],
-        error: 'FTP profile not found',
-        downloadedAt: new Date()
-      }
-    }
-
-    if (!profile.enabled) {
-      return {
-        success: false,
-        filesDownloaded: [],
-        error: 'FTP profile is disabled',
-        downloadedAt: new Date()
-      }
-    }
-
-    console.log(`🕒 Running scheduled download: ${schedule.name}`)
-
+    
     try {
-      // Test connection first
-      const connected = await this.testConnection(profile)
-      if (!connected) {
-        return {
-          success: false,
-          filesDownloaded: [],
-          error: 'Failed to connect to FTP server',
-          downloadedAt: new Date()
-        }
-      }
-
-      // List files matching the pattern
-      const files = await this.listFiles(profile, schedule.filePattern)
+      // List available files
+      const allFiles = await this.listFilesMock(profile, schedule.filePattern)
+      result.totalFilesFound = allFiles.length
       
-      if (files.length === 0) {
-        console.log(`📭 No files found matching pattern: ${schedule.filePattern}`)
-        return {
-          success: true,
-          filesDownloaded: [],
-          downloadedAt: new Date(),
-          scheduleId
+      // Filter files based on download mode
+      let filesToDownload = allFiles
+      
+      if (schedule.downloadMode === 'current-day') {
+        const today = new Date().toISOString().split('T')[0]
+        filesToDownload = allFiles.filter(file => file.name.includes(today))
+      }
+      
+      // Apply file limit
+      if (schedule.maxFilesPerRun > 0) {
+        filesToDownload = filesToDownload.slice(0, schedule.maxFilesPerRun)
+      }
+      
+      // Simulate downloads
+      for (const file of filesToDownload) {
+        const success = await this.downloadFileMock(profile, file.name, schedule.showId)
+        if (success) {
+          result.filesDownloaded.push(file.name)
+        } else {
+          result.filesSkipped.push(file.name)
         }
       }
-
-      // Download found files
-      const downloadedFiles: string[] = []
-      const errors: string[] = []
-
-      for (const file of files.slice(0, 3)) { // Limit to 3 files per schedule run
-        try {
-          const downloaded = await this.downloadFile(profile, file.name, schedule.showId)
-          if (downloaded) {
-            downloadedFiles.push(file.name)
-          } else {
-            errors.push(`Failed to download ${file.name}`)
-          }
-        } catch (error) {
-          errors.push(`Error downloading ${file.name}: ${error}`)
-        }
+      
+      result.success = result.filesDownloaded.length > 0 || filesToDownload.length === 0
+      
+      // Track download history if enabled
+      if (schedule.trackDownloadHistory) {
+        const { addDownloadHistory } = useFTPStore.getState()
+        
+        result.filesDownloaded.forEach(filename => {
+          addDownloadHistory({
+            scheduleId: schedule.id,
+            filename,
+            filePath: `${profile.basePath}/${filename}`,
+            fileSize: 15000000, // Mock size
+            fileModified: new Date(),
+            downloadedAt: result.downloadedAt,
+            successful: true
+          })
+        })
+        
+        result.filesSkipped.forEach(filename => {
+          addDownloadHistory({
+            scheduleId: schedule.id,
+            filename,
+            filePath: `${profile.basePath}/${filename}`,
+            fileSize: 15000000,
+            fileModified: new Date(),
+            downloadedAt: result.downloadedAt,
+            successful: false
+          })
+        })
       }
-
-      return {
-        success: downloadedFiles.length > 0,
-        filesDownloaded: downloadedFiles,
-        error: errors.length > 0 ? errors.join('; ') : undefined,
-        downloadedAt: new Date(),
-        scheduleId
-      }
-
+      
+      console.log(`📊 [MOCK] Download completed: ${result.filesDownloaded.length} files downloaded, ${result.filesSkipped.length} skipped`)
+      
+      return result
+      
     } catch (error) {
-      return {
-        success: false,
-        filesDownloaded: [],
-        error: `Schedule execution failed: ${error}`,
-        downloadedAt: new Date(),
-        scheduleId
-      }
+      result.error = error instanceof Error ? error.message : 'Unknown error'
+      result.success = false
+      console.error(`❌ [MOCK] Scheduled download failed:`, error)
+      return result
     }
   }
 
-  // Manual download execution (for "Run Now" functionality)
-  async executeScheduleNow(scheduleId: string): Promise<FTPDownloadResult> {
-    console.log(`▶️ Manually executing schedule: ${scheduleId}`)
-    return this.downloadFilesForSchedule(scheduleId)
-  }
-
-  // Format file size for display
-  formatFileSize(bytes: number): string {
-    const units = ['B', 'KB', 'MB', 'GB']
-    let size = bytes
-    let unitIndex = 0
-
-    while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024
-      unitIndex++
-    }
-
-    return `${size.toFixed(1)} ${units[unitIndex]}`
-  }
-
-  // Get connection status display
-  getConnectionStatusDisplay(status?: string): { text: string; color: string } {
-    switch (status) {
-      case 'connected':
-        return { text: 'Connected', color: 'text-green-600 dark:text-green-400' }
-      case 'testing':
-        return { text: 'Testing...', color: 'text-blue-600 dark:text-blue-400' }
-      case 'error':
-        return { text: 'Connection Error', color: 'text-red-600 dark:text-red-400' }
-      case 'disconnected':
+  // Filter files by download mode with enhanced logic
+  filterFilesByDownloadMode(
+    files: FTPFile[], 
+    downloadMode: 'current-day' | 'all-new' | 'pattern-match',
+    maxFiles: number = 0
+  ): { filesToDownload: FTPFile[]; reasons: Record<string, string> } {
+    const reasons: Record<string, string> = {}
+    let filtered = files
+    
+    switch (downloadMode) {
+      case 'current-day':
+        const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+        filtered = files.filter(file => {
+          // Extract date from filename (supports various date formats)
+          const dateMatches = [
+            file.name.match(/(\d{4}-\d{2}-\d{2})/), // YYYY-MM-DD
+            file.name.match(/(\d{4})(\d{2})(\d{2})/), // YYYYMMDD
+            file.name.match(/(\d{2})(\d{2})(\d{4})/) // MMDDYYYY or DDMMYYYY
+          ]
+          
+          for (const match of dateMatches) {
+            if (match) {
+              let fileDate: string
+              if (match[0].includes('-')) {
+                fileDate = match[1] // Already YYYY-MM-DD format
+              } else if (match.length === 4) {
+                // YYYYMMDD format
+                fileDate = `${match[1]}-${match[2]}-${match[3]}`
+              } else {
+                // Skip other formats for now
+                continue
+              }
+              
+              if (fileDate === today) {
+                return true
+              } else {
+                reasons[file.name] = `Date ${fileDate} does not match today (${today})`
+                return false
+              }
+            }
+          }
+          
+          reasons[file.name] = 'No recognizable date format found in filename'
+          return false
+        })
+        break
+        
+      case 'all-new':
+        // This would use download history in real implementation
+        const { isFileAlreadyDownloaded } = useFTPStore.getState()
+        filtered = files.filter(file => {
+          // For this to work, we'd need the schedule ID
+          // For now, just return all files
+          return true
+        })
+        break
+        
+      case 'pattern-match':
       default:
-        return { text: 'Disconnected', color: 'text-gray-600 dark:text-gray-400' }
+        // Return all matching files
+        filtered = files
+        break
     }
+    
+    // Sort by modification date (newest first)
+    filtered.sort((a, b) => b.modifiedDate.getTime() - a.modifiedDate.getTime())
+    
+    // Apply file limit if specified
+    if (maxFiles > 0 && filtered.length > maxFiles) {
+      const skipped = filtered.slice(maxFiles)
+      skipped.forEach(file => {
+        reasons[file.name] = `Exceeds file limit of ${maxFiles}`
+      })
+      filtered = filtered.slice(0, maxFiles)
+    }
+    
+    return { filesToDownload: filtered, reasons }
   }
 }
 
-// Singleton instance
+// Export singleton instance
 export const ftpService = new FTPService() 

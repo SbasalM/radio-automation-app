@@ -201,6 +201,33 @@ export function FilePatternInput({ patterns, onChange, fileNamingRules }: FilePa
     }
   }
 
+  // Validate and provide feedback for watch paths
+  const validateWatchPath = (watchPath: string): { isValid: boolean; message: string; type: 'success' | 'warning' | 'error' } => {
+    if (!watchPath.trim()) {
+      return { isValid: true, message: 'Will use global watch directory setting', type: 'success' }
+    }
+    
+    // Clean the path by removing surrounding quotes if present
+    const cleanPath = watchPath.trim().replace(/^["']|["']$/g, '')
+    
+    // Check if it looks like an absolute Windows path
+    if (/^[A-Za-z]:\\/.test(cleanPath)) {
+      return { isValid: true, message: 'Absolute Windows path - will be used exactly as specified', type: 'success' }
+    }
+    
+    // Check if it looks like just a folder name (from browse button)
+    if (!cleanPath.includes('\\') && !cleanPath.includes('/')) {
+      return { 
+        isValid: false, 
+        message: '⚠️ This looks like just a folder name. Please enter the full path (e.g., C:\\Users\\YourName\\...)', 
+        type: 'warning' 
+      }
+    }
+    
+    // Relative path
+    return { isValid: true, message: 'Relative path - will be resolved within workspace', type: 'success' }
+  }
+
   const examplePatterns = getExamplePatterns()
 
   return (
@@ -400,33 +427,46 @@ export function FilePatternInput({ patterns, onChange, fileNamingRules }: FilePa
               {/* Watch Folder Path */}
               {pattern.type === 'watch' && (
                 <div className="space-y-3 pl-6 border-l-2 border-blue-200 dark:border-blue-800">
-                  <div className="flex items-end space-x-3">
+                  <div className="flex items-end space-x-2">
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                         Watch Folder Path (optional)
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g., C:\Radio\Incoming\MyShow or leave blank for global setting"
+                        placeholder="Full path: C:\Users\YourName\Documents\Radio\Input (or leave blank)"
                         value={pattern.watchPath || ''}
-                        onChange={(e) => updatePattern(pattern.id, { watchPath: e.target.value })}
+                        onChange={(e) => {
+                          // Automatically strip surrounding quotes from pasted paths
+                          const cleanedPath = e.target.value.trim().replace(/^["']|["']$/g, '')
+                          updatePattern(pattern.id, { watchPath: cleanedPath })
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
+                      {/* Simple validation feedback */}
+                      {pattern.watchPath && (
+                        <div className={`text-xs mt-1 ${
+                          validateWatchPath(pattern.watchPath).type === 'success' ? 'text-green-600 dark:text-green-400' :
+                          validateWatchPath(pattern.watchPath).type === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
+                          'text-red-600 dark:text-red-400'
+                        }`}>
+                          {validateWatchPath(pattern.watchPath).message}
+                        </div>
+                      )}
                     </div>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => handleSelectWatchDirectory(pattern.id)}
-                      className="h-9"
+                      className="px-3 py-2 h-10"
+                      title="Browse (folder name only - edit to add full path)"
                     >
-                      <Folder className="h-4 w-4 mr-1" />
-                      Browse
+                      <Folder className="h-4 w-4" />
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    If not specified, the global watch folder setting will be used. <br />
-                    <strong>Note:</strong> The Browse button may only show the folder name for security reasons. You can manually enter the full path (e.g., C:\Radio\Shows\MyShow).
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    💡 Copy the full path from File Explorer's address bar for best results
                   </p>
                 </div>
               )}

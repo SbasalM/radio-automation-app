@@ -202,17 +202,17 @@ export function EnhancedTrimEditor({
     }
   }, [trimPoints]) // Remove onRealTimeUpdate from deps to prevent loops
 
-  // Update trim points with better bounds checking
+  // Update trim points with better bounds checking and rounding
   const handleTrimChange = useCallback((newTrimPoints: TrimPoints) => {
     // Ensure bounds are respected and handles don't disappear
     const safeStartTime = Math.max(0, Math.min(newTrimPoints.startTime, audioFile.duration - 1))
     const safeEndTime = Math.max(safeStartTime + 1, Math.min(newTrimPoints.endTime, audioFile.duration))
     
     const safeTrimPoints: TrimPoints = {
-      startTime: safeStartTime,
-      endTime: safeEndTime,
-      fadeInDuration: Math.max(0, Math.min(newTrimPoints.fadeInDuration, (safeEndTime - safeStartTime) / 2)),
-      fadeOutDuration: Math.max(0, Math.min(newTrimPoints.fadeOutDuration, (safeEndTime - safeStartTime) / 2))
+      startTime: Math.round(safeStartTime * 10) / 10, // Round to 1 decimal place
+      endTime: Math.round(safeEndTime * 10) / 10,     // Round to 1 decimal place
+      fadeInDuration: Math.round(Math.max(0, Math.min(newTrimPoints.fadeInDuration, (safeEndTime - safeStartTime) / 2)) * 10) / 10,
+      fadeOutDuration: Math.round(Math.max(0, Math.min(newTrimPoints.fadeOutDuration, (safeEndTime - safeStartTime) / 2)) * 10) / 10
     }
     
     setTrimPoints(safeTrimPoints)
@@ -389,10 +389,10 @@ export function EnhancedTrimEditor({
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-4 ${className}`}>
       {/* Header */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Scissors className="h-5 w-5" />
@@ -417,14 +417,14 @@ export function EnhancedTrimEditor({
             <div className="flex items-center justify-between">
               <span>File: {audioFile.filename}</span>
               <span className="text-blue-600 dark:text-blue-400 font-medium">
-                🎯 Drag the red handles to set where audio will be trimmed
+                🎯 Drag red handles to trim • Click waveform to set playhead
               </span>
             </div>
             {waveformData && (
               <div className="mt-1 text-xs">
                 <span className={waveformData.peaks.length === 800 ? "text-green-600" : "text-amber-600"}>
                   Waveform: {waveformData.peaks.length} points 
-                  {waveformData.peaks.length === 800 ? " (Real data from backend)" : " (May be fallback data)"}
+                  {waveformData.peaks.length === 800 ? " (Real data)" : " (Fallback data)"}
                 </span>
               </div>
             )}
@@ -434,10 +434,10 @@ export function EnhancedTrimEditor({
 
       {/* Waveform Display */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Waveform</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Waveform</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-2">
           <Waveform
             waveformData={waveformData}
             trimPoints={trimPoints}
@@ -447,165 +447,12 @@ export function EnhancedTrimEditor({
             onPlayPause={handlePlayPause}
             isPlaying={isPlaying}
             canPlay={!!audioElement}
-            height={150}
+            height={120}
           />
         </CardContent>
       </Card>
 
-      {/* Trim Controls */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Trim Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Trim Points */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Start Time (seconds)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max={audioFile.duration}
-                step="0.1"
-                value={trimPoints.startTime}
-                onChange={(e) => handleStartTimeChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
-                placeholder="0"
-              />
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {audioService.formatTime(trimPoints.startTime)}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                End Time (seconds)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max={audioFile.duration}
-                step="0.1"
-                value={trimPoints.endTime}
-                onChange={(e) => handleEndTimeChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
-                placeholder="0"
-              />
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {audioService.formatTime(trimPoints.endTime)}
-              </div>
-            </div>
-          </div>
-
-          {/* Fade Settings */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Fade In Duration (seconds)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="10"
-                step="0.1"
-                value={trimPoints.fadeInDuration}
-                onChange={(e) => handleFadeInChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Fade Out Duration (seconds)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="10"
-                step="0.1"
-                value={trimPoints.fadeOutDuration}
-                onChange={(e) => handleFadeOutChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAutoTrim}
-            >
-              Auto Trim Silence
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset to Full Duration
-            </Button>
-          </div>
-
-          {/* Validation Errors */}
-          {validationErrors.length > 0 && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-              <div className="text-red-800 dark:text-red-200 text-sm font-medium mb-1">
-                Validation Errors:
-              </div>
-              <ul className="text-red-700 dark:text-red-300 text-sm space-y-1">
-                {validationErrors.map((error, index) => (
-                  <li key={index}>• {error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Live Preview Summary */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-            <div className="text-blue-800 dark:text-blue-200 text-sm">
-              <div className="font-medium mb-1">Live Preview:</div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <strong>Trim Range:</strong> {audioService.formatTime(trimPoints.startTime)} - {audioService.formatTime(trimPoints.endTime)}
-                </div>
-                <div>
-                  <strong>Duration:</strong> {audioService.formatTime(trimmedDuration)}
-                </div>
-                <div>
-                  <strong>Time Saved:</strong> {audioService.formatTime(timeSaved)}
-                </div>
-                <div>
-                  <strong>Fades:</strong> {trimPoints.fadeInDuration > 0 ? `${trimPoints.fadeInDuration}s in` : 'No fade in'}, {trimPoints.fadeOutDuration > 0 ? `${trimPoints.fadeOutDuration}s out` : 'No fade out'}
-                </div>
-              </div>
-              
-              {/* Debug info for uploaded files */}
-              {audioFile.filename && (
-                <div className="mt-2 pt-2 border-t border-blue-300 dark:border-blue-700">
-                  <div className="text-xs text-blue-600 dark:text-blue-400">
-                    <strong>Debug:</strong> <a 
-                      href={`http://localhost:3001/api/audio/${audioFile.filename}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline hover:text-blue-800 dark:hover:text-blue-200"
-                    >
-                      Test direct audio access
-                    </a>
-                    {!audioElement && ' (Audio playback unavailable)'}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Action Buttons */}
+      {/* Action Buttons Only */}
       <div className="flex justify-end space-x-3">
         <Button
           variant="outline"

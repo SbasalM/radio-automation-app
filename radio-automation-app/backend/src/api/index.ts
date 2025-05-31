@@ -5,12 +5,9 @@ import watchRoutes from './watch'
 import systemRoutes from './system'
 
 export function setupRoutes(app: Express): void {
-  // API base path
-  const apiBase = '/api'
-  
-  // Register route modules
-  app.use(`${apiBase}/shows`, showRoutes)
-  app.use(`${apiBase}/queue`, queueRoutes)
-  app.use(`${apiBase}/watch`, watchRoutes)
-  app.use(`${apiBase}/system`, systemRoutes)
+  // Mount API routes
+  app.use('/api/shows', showRoutes)
+  app.use('/api/queue', queueRoutes)
+  app.use('/api/watch', watchRoutes) // Mount watch routes under /api/watch
+  app.use('/api/system', systemRoutes) // Fix: mount system routes under /api/system instead of /api/status
 } 

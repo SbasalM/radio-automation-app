@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { X, Settings, FileText, Music, Tags, Speaker, Folder, Info } from 'lucide-react'
+import { X, Settings, FileText, Music, Tags, Speaker, Folder, Info, Volume2, Waves, Sliders, Zap, Scissors } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { FilePatternInput } from './FilePatternInput'
@@ -18,8 +18,9 @@ interface ShowFormModalProps {
 }
 
 type TabType = 'general' | 'patterns' | 'metadata' | 'audio' | 'promo'
-type AudioSubSection = 'general' | 'quality' | 'effects' | 'advanced' | 'trim' | 'processing'
 
+// Audio processing sub-tabs
+type AudioSubTab = 'general' | 'quality' | 'effects' | 'advanced' | 'trim' | 'processing'
 
 // Default values to ensure all required fields are present
 const DEFAULT_AUDIO_SETTINGS: AdvancedAudioSettings = {
@@ -78,10 +79,9 @@ const DEFAULT_FILE_NAMING_RULES: FileNamingRules = {
 export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalProps) {
   const { addShow, updateShow } = useShowStore()
   const [activeTab, setActiveTab] = useState<TabType>('general')
-  const [audioSubSection, setAudioSubSection] = useState<AudioSubSection>('general')
-
-  const [sampleAudioFile, setSampleAudioFile] = useState<AudioFile | null>(null)
+  const [activeAudioSubTab, setActiveAudioSubTab] = useState<AudioSubTab>('general')
   const [trimEnabled, setTrimEnabled] = useState(false)
+  const [sampleAudioFile, setSampleAudioFile] = useState<AudioFile | null>(null)
   
   const [formData, setFormData] = useState<{
     name: string
@@ -102,6 +102,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
     autoProcessing: boolean
     processOnSchedule: boolean
     schedulePattern?: string
+    processExistingFiles: boolean
     enableNotifications: boolean
     notificationEmails: string[]
     alertOnErrors: boolean
@@ -127,6 +128,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
     processingOptions: DEFAULT_PROCESSING_OPTIONS,
     autoProcessing: true,
     processOnSchedule: false,
+    processExistingFiles: false,
     enableNotifications: false,
     notificationEmails: [],
     alertOnErrors: true,
@@ -159,6 +161,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
         autoProcessing: editingShow.autoProcessing ?? true,
         processOnSchedule: editingShow.processOnSchedule ?? false,
         schedulePattern: editingShow.schedulePattern || '',
+        processExistingFiles: editingShow.processExistingFiles ?? false,
         enableNotifications: editingShow.enableNotifications ?? false,
         notificationEmails: editingShow.notificationEmails || [],
         alertOnErrors: editingShow.alertOnErrors ?? true,
@@ -188,6 +191,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
         autoProcessing: true,
         processOnSchedule: false,
         schedulePattern: '',
+        processExistingFiles: false,
         enableNotifications: false,
         notificationEmails: [],
         alertOnErrors: true,
@@ -244,6 +248,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
         processingOptions: formData.processingOptions,
         processOnSchedule: formData.processOnSchedule,
         schedulePattern: formData.schedulePattern,
+        processExistingFiles: formData.processExistingFiles,
         enableNotifications: formData.enableNotifications,
         notificationEmails: formData.notificationEmails,
         alertOnErrors: formData.alertOnErrors,
@@ -255,14 +260,16 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
 
       if (editingShow) {
         await updateShow(editingShow.id, showData)
+        alert(`✅ Show "${formData.name}" updated successfully!`)
       } else {
         await addShow(showData)
+        alert(`✅ Show "${formData.name}" created successfully!`)
       }
 
       onClose()
     } catch (error) {
       console.error('Failed to save show:', error)
-      alert('Failed to save show. Please try again.')
+      alert('❌ Failed to save show. Please try again.')
     }
   }
 
@@ -278,13 +285,15 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
       
       setSampleAudioFile(realAudioFile)
       
-      // Set default trim points to full duration if none exist
+      // Set default trim points to a reasonable section (first 30 seconds) if none exist
       if (formData.trimSettings.startSeconds === 0 && formData.trimSettings.endSeconds === 0) {
+        const reasonableEndTime = Math.min(30, realAudioFile.duration) // First 30 seconds or full duration if shorter
         setFormData({
           ...formData,
           trimSettings: {
             ...formData.trimSettings,
-            endSeconds: realAudioFile.duration // Set end to full duration
+            startSeconds: 0, // Start at beginning
+            endSeconds: reasonableEndTime // End after 30 seconds or at file end
           }
         })
       }
@@ -305,6 +314,18 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
         lastModified: new Date()
       }
       setSampleAudioFile(fallbackAudioFile)
+      
+      // Set reasonable default trim for fallback too
+      if (formData.trimSettings.startSeconds === 0 && formData.trimSettings.endSeconds === 0) {
+        setFormData({
+          ...formData,
+          trimSettings: {
+            ...formData.trimSettings,
+            startSeconds: 0,
+            endSeconds: 30 // First 30 seconds
+          }
+        })
+      }
     }
   }
 
@@ -349,8 +370,8 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
         // For better UX, show the directory name but inform user they can edit
         setFormData({ ...formData, outputDirectory: selectedPath })
         
-        // Show a helpful message
-        console.log('Selected directory:', dirHandle.name, '- You can edit this to specify the full path')
+        // Show a helpful alert with instructions
+        alert(`📁 Directory selected: "${selectedPath}"\n\n⚠️ Browser Security Limitation:\nOnly the folder name was captured due to browser security restrictions.\n\n💡 For full path functionality:\n1. Copy the full path from File Explorer address bar\n2. Paste it into the input field\n3. Example: C:\\Users\\YourName\\OneDrive\\Archive\\MyFolder`)
       } else {
         // Fallback: Create a hidden file input for directory selection
         const input = document.createElement('input')
@@ -366,11 +387,15 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
             const pathParts = firstFile.webkitRelativePath.split('/')
             if (pathParts.length > 1) {
               // Use the parent directory name or full path
-              const directoryPath = pathParts.slice(0, -1).join('/')
+              const directoryPath = pathParts.slice(0, -1).join('\\')
               setFormData({ ...formData, outputDirectory: directoryPath })
+              
+              // Show helpful message
+              alert(`📁 Directory selected: "${directoryPath}"\n\n⚠️ This is a relative path within the selected folder.\n\n💡 For absolute paths:\nCopy the full path from File Explorer and paste it here.\nExample: C:\\Users\\YourName\\Documents\\Radio`)
             } else {
               // Use just the directory name if no subdirectory
               setFormData({ ...formData, outputDirectory: pathParts[0] })
+              alert(`📁 Directory selected: "${pathParts[0]}"\n\n💡 Tip: For full path functionality, copy the complete path from File Explorer.`)
             }
           }
           document.body.removeChild(input)
@@ -384,12 +409,48 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
     }
   }
 
+  // Validate and provide feedback for output paths
+  const validateOutputPath = (outputPath: string): { isValid: boolean; message: string; type: 'success' | 'warning' | 'error' } => {
+    if (!outputPath.trim()) {
+      return { isValid: true, message: 'Will use global output directory setting', type: 'success' }
+    }
+    
+    // Clean the path by removing surrounding quotes if present
+    const cleanPath = outputPath.trim().replace(/^["']|["']$/g, '')
+    
+    // Check if it looks like an absolute Windows path
+    if (/^[A-Za-z]:\\/.test(cleanPath)) {
+      return { isValid: true, message: 'Absolute Windows path - will be used exactly as specified', type: 'success' }
+    }
+    
+    // Check if it looks like just a folder name (from browse button)
+    if (!cleanPath.includes('\\') && !cleanPath.includes('/')) {
+      return { 
+        isValid: false, 
+        message: '⚠️ This looks like just a folder name. Please enter the full path (e.g., C:\\Users\\YourName\\...)', 
+        type: 'warning' 
+      }
+    }
+    
+    // Relative path
+    return { isValid: true, message: 'Relative path - will be resolved within workspace', type: 'success' }
+  }
+
   const tabs = [
     { id: 'general', label: 'General', icon: Settings },
     { id: 'patterns', label: 'Input & Output', icon: Folder },
     { id: 'metadata', label: 'Metadata', icon: Tags },
     { id: 'audio', label: 'Audio Processing', icon: Music },
     { id: 'promo', label: 'Promo Settings', icon: Speaker }
+  ] as const
+
+  const audioSubTabs = [
+    { id: 'general', label: 'General Audio', icon: Volume2 },
+    { id: 'quality', label: 'Audio Quality', icon: Waves },
+    { id: 'effects', label: 'Effects', icon: Sliders },
+    { id: 'advanced', label: 'Advanced', icon: Zap },
+    { id: 'trim', label: 'Trim Points', icon: Scissors },
+    { id: 'processing', label: 'Processing Chain', icon: Music }
   ] as const
 
   if (!isOpen) return null
@@ -421,7 +482,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => setActiveTab(tab.id as TabType)}
                   className={`
                     flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors
                     ${activeTab === tab.id
@@ -522,6 +583,24 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
                       <label className="flex items-center">
                         <input
                           type="checkbox"
+                          checked={formData.processExistingFiles}
+                          onChange={(e) => setFormData({ ...formData, processExistingFiles: e.target.checked })}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Process Existing Files</span>
+                      </label>
+                      <div className="group relative">
+                        <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                        <div className="absolute right-0 bottom-6 mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                          When enabled, existing files in watch folders will be processed when the show starts. When disabled, only new files added after the show starts will be processed.
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
                           checked={formData.alertOnErrors}
                           onChange={(e) => setFormData({ ...formData, alertOnErrors: e.target.checked })}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -596,26 +675,38 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
                       id="output-directory"
                       name="outputDirectory"
                       value={formData.outputDirectory}
-                      onChange={(e) => setFormData({ ...formData, outputDirectory: e.target.value })}
+                      onChange={(e) => {
+                        // Automatically strip surrounding quotes from pasted paths
+                        const cleanedPath = e.target.value.trim().replace(/^["']|["']$/g, '')
+                        setFormData({ ...formData, outputDirectory: cleanedPath })
+                      }}
                       className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="e.g., C:\Radio\Processed\MyShow or leave blank for global setting"
+                      placeholder="Full path: C:\Users\YourName\Documents\Radio\Output (or leave blank)"
                     />
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={handleSelectDirectory}
-                      className="px-3 py-2 h-10 flex items-center space-x-2 border-green-300 hover:bg-green-50 dark:border-green-700 dark:hover:bg-green-900/20"
-                      title="Browse for directory"
+                      className="px-3 py-2 h-10"
+                      title="Browse (folder name only - edit to add full path)"
                     >
                       <Folder className="h-4 w-4" />
-                      <span className="hidden sm:inline">Browse</span>
                     </Button>
                   </div>
+                  {/* Simple validation feedback */}
+                  {formData.outputDirectory && (
+                    <div className={`text-xs mt-1 ${
+                      validateOutputPath(formData.outputDirectory).type === 'success' ? 'text-green-600 dark:text-green-400' :
+                      validateOutputPath(formData.outputDirectory).type === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
+                      'text-red-600 dark:text-red-400'
+                    }`}>
+                      {validateOutputPath(formData.outputDirectory).message}
+                    </div>
+                  )}
                   {errors.outputDirectory && <p className="text-red-500 text-sm mt-2">{errors.outputDirectory}</p>}
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    <strong>Optional:</strong> If not specified, the global output directory setting will be used. <br />
-                    <strong>Note:</strong> The Browse button may only show the folder name for security reasons. You can manually enter the full path.
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    💡 Copy the full path from File Explorer's address bar for best results
                   </p>
                 </div>
               </div>
@@ -635,283 +726,351 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
             )}
 
             {activeTab === 'audio' && (
-              <div className="space-y-4">
-                {/* Sub-navigation for Audio Processing */}
-                <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
-                  {[
-                    { id: 'general', label: 'General' },
-                    { id: 'quality', label: 'Audio Quality' },
-                    { id: 'effects', label: 'Effects' },
-                    { id: 'advanced', label: 'Advanced' },
-                    { id: 'trim', label: 'Trim Points' },
-                    { id: 'processing', label: 'Processing Chain' }
-                  ].map(({ id, label }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setAudioSubSection(id as AudioSubSection)}
-                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        audioSubSection === id
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+              <div className="space-y-6">
+                {/* Audio Sub-Tab Navigation */}
+                <div className="border-b border-gray-200 dark:border-gray-700">
+                  <nav className="flex space-x-6">
+                    {audioSubTabs.map((subTab) => {
+                      const Icon = subTab.icon
+                      return (
+                        <button
+                          key={subTab.id}
+                          type="button"
+                          onClick={() => setActiveAudioSubTab(subTab.id as AudioSubTab)}
+                          className={`
+                            flex items-center space-x-2 py-3 px-1 border-b-2 font-medium text-sm transition-colors
+                            ${activeAudioSubTab === subTab.id
+                              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                            }
+                          `}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{subTab.label}</span>
+                        </button>
+                      )
+                    })}
+                  </nav>
                 </div>
 
-                {/* Audio Section Content */}
-                <div>
-                  {audioSubSection === 'trim' ? (
-                    <div className="space-y-6">
-                      {/* Trim Enable/Disable Toggle */}
-                      <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-900/50 dark:to-blue-900/20 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center space-x-3">
-                            <label className="flex items-center cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={trimEnabled}
-                                onChange={(e) => {
-                                  setTrimEnabled(e.target.checked)
-                                  if (!e.target.checked) {
-                                    // Reset trim settings when disabled
+                {/* Audio Sub-Tab Content */}
+                <div className="space-y-4">
+                  <ErrorBoundary>
+                    {activeAudioSubTab === 'general' && (
+                      <AudioProcessingConfig
+                        processingOptions={formData.processingOptions}
+                        onUpdateProcessingOptions={(processingOptions: ProcessingOptions) => setFormData({ ...formData, processingOptions })}
+                        activeSection="general"
+                      />
+                    )}
+
+                    {activeAudioSubTab === 'quality' && (
+                      <AudioProcessingConfig
+                        processingOptions={formData.processingOptions}
+                        onUpdateProcessingOptions={(processingOptions: ProcessingOptions) => setFormData({ ...formData, processingOptions })}
+                        activeSection="quality"
+                      />
+                    )}
+
+                    {activeAudioSubTab === 'effects' && (
+                      <AudioProcessingConfig
+                        processingOptions={formData.processingOptions}
+                        onUpdateProcessingOptions={(processingOptions: ProcessingOptions) => setFormData({ ...formData, processingOptions })}
+                        activeSection="effects"
+                      />
+                    )}
+
+                    {activeAudioSubTab === 'advanced' && (
+                      <AudioProcessingConfig
+                        processingOptions={formData.processingOptions}
+                        onUpdateProcessingOptions={(processingOptions: ProcessingOptions) => setFormData({ ...formData, processingOptions })}
+                        activeSection="advanced"
+                      />
+                    )}
+
+                    {activeAudioSubTab === 'trim' && (
+                      <div className="space-y-6">
+                        {/* Trim Enable/Disable Toggle */}
+                        <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-900/50 dark:to-blue-900/20 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                              <label className="flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={trimEnabled}
+                                  onChange={(e) => {
+                                    setTrimEnabled(e.target.checked)
+                                    if (!e.target.checked) {
+                                      // Reset trim settings when disabled
+                                      setFormData({
+                                        ...formData,
+                                        trimSettings: {
+                                          startSeconds: 0,
+                                          endSeconds: 0,
+                                          fadeIn: false,
+                                          fadeOut: false
+                                        }
+                                      })
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="ml-3 text-lg font-medium text-gray-900 dark:text-gray-100">
+                                  Enable Audio Trimming
+                                </span>
+                              </label>
+                            </div>
+                            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              trimEnabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' 
+                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                            }`}>
+                              {trimEnabled ? 'Enabled' : 'Disabled'}
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {trimEnabled 
+                              ? 'Audio files will be trimmed according to the settings below.' 
+                              : 'No trimming will be applied. Audio files will be processed at full length.'
+                            }
+                          </p>
+                        </div>
+
+                        {trimEnabled && (
+                          <>
+                            {/* Current trim settings display */}
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <div className="flex items-center justify-between mb-4">
+                                <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                                  <Music className="h-5 w-5 mr-2 text-blue-600" />
+                                  Current Trim Settings
+                                </h4>
+                                <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                                  <div className={`h-2 w-2 rounded-full mr-2 ${
+                                    formData.trimSettings.startSeconds > 0 || formData.trimSettings.endSeconds > 0 
+                                      ? 'bg-green-500' 
+                                      : 'bg-gray-400'
+                                  }`}></div>
+                                  {formData.trimSettings.startSeconds > 0 || formData.trimSettings.endSeconds > 0 
+                                    ? 'Trim configured' 
+                                    : 'No trim points set'
+                                  }
+                                </div>
+                              </div>
+                              
+                              {/* Manual trim controls */}
+                              <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Start Trim (seconds)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    value={formData.trimSettings.startSeconds}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value) || 0
+                                      const roundedValue = Math.round(value * 10) / 10
+                                      setFormData({
+                                        ...formData,
+                                        trimSettings: { ...formData.trimSettings, startSeconds: roundedValue }
+                                      })
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="0.0"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    End Trim (seconds)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    value={formData.trimSettings.endSeconds}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value) || 0
+                                      const roundedValue = Math.round(value * 10) / 10
+                                      setFormData({
+                                        ...formData,
+                                        trimSettings: { ...formData.trimSettings, endSeconds: roundedValue }
+                                      })
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="0.0"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="flex space-x-4">
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.trimSettings.fadeIn}
+                                    onChange={(e) => setFormData({
+                                      ...formData,
+                                      trimSettings: { ...formData.trimSettings, fadeIn: e.target.checked }
+                                    })}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Fade In</span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.trimSettings.fadeOut}
+                                    onChange={(e) => setFormData({
+                                      ...formData,
+                                      trimSettings: { ...formData.trimSettings, fadeOut: e.target.checked }
+                                    })}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Fade Out</span>
+                                </label>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Reset to reasonable defaults
                                     setFormData({
                                       ...formData,
                                       trimSettings: {
                                         startSeconds: 0,
-                                        endSeconds: 0,
+                                        endSeconds: 30,
                                         fadeIn: false,
                                         fadeOut: false
                                       }
                                     })
-                                  }
-                                }}
-                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              />
-                              <span className="ml-3 text-lg font-medium text-gray-900 dark:text-gray-100">
-                                Enable Audio Trimming
-                              </span>
-                            </label>
-                          </div>
-                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            trimEnabled 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' 
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                          }`}>
-                            {trimEnabled ? 'Enabled' : 'Disabled'}
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {trimEnabled 
-                            ? 'Audio files will be trimmed according to the settings below.' 
-                            : 'No trimming will be applied. Audio files will be processed at full length.'
-                          }
-                        </p>
-                      </div>
-
-                      {trimEnabled && (
-                        <>
-                          {/* Current trim settings display */}
-                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800">
-                            <div className="flex items-center justify-between mb-4">
-                              <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center">
-                                <Music className="h-5 w-5 mr-2 text-blue-600" />
-                                Current Trim Settings
-                              </h4>
-                              <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                                <div className={`h-2 w-2 rounded-full mr-2 ${
-                                  formData.trimSettings.startSeconds > 0 || formData.trimSettings.endSeconds > 0 
-                                    ? 'bg-green-500' 
-                                    : 'bg-gray-400'
-                                }`}></div>
-                                {formData.trimSettings.startSeconds > 0 || formData.trimSettings.endSeconds > 0 
-                                  ? 'Trim configured' 
-                                  : 'No trim points set'
-                                }
-                              </div>
-                            </div>
-                            
-                            {/* Manual trim controls */}
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                  Start Trim (seconds)
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={formData.trimSettings.startSeconds}
-                                  onChange={(e) => setFormData({
-                                    ...formData,
-                                    trimSettings: { ...formData.trimSettings, startSeconds: Number(e.target.value) }
-                                  })}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                  End Trim (seconds)
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={formData.trimSettings.endSeconds}
-                                  onChange={(e) => setFormData({
-                                    ...formData,
-                                    trimSettings: { ...formData.trimSettings, endSeconds: Number(e.target.value) }
-                                  })}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                              </div>
-                            </div>
-                            
-                            <div className="flex space-x-4">
-                              <label className="flex items-center">
-                                <input
-                                  type="checkbox"
-                                  checked={formData.trimSettings.fadeIn}
-                                  onChange={(e) => setFormData({
-                                    ...formData,
-                                    trimSettings: { ...formData.trimSettings, fadeIn: e.target.checked }
-                                  })}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Fade In</span>
-                              </label>
-                              <label className="flex items-center">
-                                <input
-                                  type="checkbox"
-                                  checked={formData.trimSettings.fadeOut}
-                                  onChange={(e) => setFormData({
-                                    ...formData,
-                                    trimSettings: { ...formData.trimSettings, fadeOut: e.target.checked }
-                                  })}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Fade Out</span>
-                              </label>
-                            </div>
-                          </div>
-
-                          {/* Visual Trim Editor Section */}
-                          <div>
-                            <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                                Visual Trim Editor
-                              </h3>
-                              {!sampleAudioFile && (
-                                <Button
-                                  type="button"
-                                  onClick={handleLoadSampleFile}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                                  size="sm"
-                                >
-                                  <Music className="h-4 w-4 mr-2" />
-                                  Browse Files
-                                </Button>
-                              )}
-                            </div>
-
-                            {sampleAudioFile ? (
-                              <ErrorBoundary>
-                                <EnhancedTrimEditor
-                                  audioFile={sampleAudioFile}
-                                  onSave={handleSaveTrimPoints}
-                                  onCancel={() => setSampleAudioFile(null)}
-                                  onRealTimeUpdate={handleTrimPointsChange}
-                                  initialTrimPoints={{
-                                    startTime: formData.trimSettings.startSeconds,
-                                    endTime: formData.trimSettings.endSeconds || sampleAudioFile.duration,
-                                    fadeInDuration: formData.trimSettings.fadeIn ? 0.5 : 0,
-                                    fadeOutDuration: formData.trimSettings.fadeOut ? 1.0 : 0
                                   }}
-                                />
-                              </ErrorBoundary>
-                            ) : (
-                              <div 
-                                className="border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-8 bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
-                                onDrop={async (e) => {
-                                  e.preventDefault()
-                                  const files = Array.from(e.dataTransfer.files)
-                                  const droppedFile = files.find(f => f.type.startsWith('audio/'))
-                                  if (droppedFile) {
-                                    try {
-                                      console.log('Uploading dropped audio file:', droppedFile.name, droppedFile.size)
-                                      
-                                      // Upload the file to the backend for temporary preview
-                                      const uploadFormData = new FormData()
-                                      uploadFormData.append('audio', droppedFile)
-                                      
-                                      const uploadResponse = await fetch('http://localhost:3001/api/audio/upload-sample', {
-                                        method: 'POST',
-                                        body: uploadFormData
-                                      })
-                                      
-                                      if (!uploadResponse.ok) {
-                                        throw new Error('Upload failed')
-                                      }
-                                      
-                                      const uploadResult = await uploadResponse.json()
-                                      console.log('File uploaded successfully:', uploadResult)
-                                      
-                                      // Now get proper audio metadata using the uploaded filename
-                                      const audioFileObj = await audioService.analyzeAudioFile(uploadResult.filename, uploadResult.size)
-                                      
-                                      console.log('Created audio file object:', audioFileObj)
-                                      setSampleAudioFile(audioFileObj)
-                                      
-                                      // Set default trim points to full duration if none exist
-                                      if (formData.trimSettings.startSeconds === 0 && formData.trimSettings.endSeconds === 0) {
-                                        setFormData({
-                                          ...formData,
-                                          trimSettings: {
-                                            ...formData.trimSettings,
-                                            endSeconds: audioFileObj.duration
-                                          }
+                                  className="ml-4"
+                                >
+                                  Reset to 0-30s
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Visual Trim Editor Section */}
+                            <div>
+                              <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                                  Visual Trim Editor
+                                </h3>
+                                {!sampleAudioFile && (
+                                  <Button
+                                    type="button"
+                                    onClick={handleLoadSampleFile}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                                    size="sm"
+                                  >
+                                    <Music className="h-4 w-4 mr-2" />
+                                    Browse Files
+                                  </Button>
+                                )}
+                              </div>
+
+                              {sampleAudioFile ? (
+                                <ErrorBoundary>
+                                  <EnhancedTrimEditor
+                                    audioFile={sampleAudioFile}
+                                    onSave={handleSaveTrimPoints}
+                                    onCancel={() => setSampleAudioFile(null)}
+                                    onRealTimeUpdate={handleTrimPointsChange}
+                                    initialTrimPoints={{
+                                      startTime: formData.trimSettings.startSeconds,
+                                      endTime: formData.trimSettings.endSeconds || sampleAudioFile.duration,
+                                      fadeInDuration: formData.trimSettings.fadeIn ? 0.5 : 0,
+                                      fadeOutDuration: formData.trimSettings.fadeOut ? 1.0 : 0
+                                    }}
+                                  />
+                                </ErrorBoundary>
+                              ) : (
+                                <div 
+                                  className="border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-8 bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
+                                  onDrop={async (e) => {
+                                    e.preventDefault()
+                                    const files = Array.from(e.dataTransfer.files)
+                                    const droppedFile = files.find(f => f.type.startsWith('audio/'))
+                                    if (droppedFile) {
+                                      try {
+                                        console.log('Uploading dropped audio file:', droppedFile.name, droppedFile.size)
+                                        
+                                        // Upload the file to the backend for temporary preview
+                                        const uploadFormData = new FormData()
+                                        uploadFormData.append('audio', droppedFile)
+                                        
+                                        const uploadResponse = await fetch('http://localhost:3001/api/audio/upload-sample', {
+                                          method: 'POST',
+                                          body: uploadFormData
                                         })
+                                        
+                                        if (!uploadResponse.ok) {
+                                          throw new Error('Upload failed')
+                                        }
+                                        
+                                        const uploadResult = await uploadResponse.json()
+                                        console.log('File uploaded successfully:', uploadResult)
+                                        
+                                        // Now get proper audio metadata using the uploaded filename
+                                        const audioFileObj = await audioService.analyzeAudioFile(uploadResult.filename, uploadResult.size)
+                                        
+                                        console.log('Created audio file object:', audioFileObj)
+                                        setSampleAudioFile(audioFileObj)
+                                        
+                                        // Set default trim points to full duration if none exist
+                                        if (formData.trimSettings.startSeconds === 0 && formData.trimSettings.endSeconds === 0) {
+                                          setFormData({
+                                            ...formData,
+                                            trimSettings: {
+                                              ...formData.trimSettings,
+                                              endSeconds: audioFileObj.duration
+                                            }
+                                          })
+                                        }
+                                      } catch (error) {
+                                        console.error('Failed to upload and analyze audio file:', error)
+                                        alert('Failed to upload audio file. Please try again.')
                                       }
-                                    } catch (error) {
-                                      console.error('Failed to upload and analyze audio file:', error)
-                                      alert('Failed to upload audio file. Please try again.')
                                     }
-                                  }
-                                }}
-                                onDragOver={(e) => e.preventDefault()}
-                                onClick={handleLoadSampleFile}
-                              >
-                                <div className="text-center text-blue-600 dark:text-blue-400">
-                                  <Music className="h-16 w-16 mx-auto mb-4" />
-                                  <h4 className="text-lg font-medium mb-2">Drop Audio File or Click to Browse</h4>
-                                  <p className="mb-4">Load a sample audio file to visually set trim points with waveform display</p>
-                                  <div className="bg-white dark:bg-blue-900/30 p-4 rounded-lg mb-4 border border-blue-200 dark:border-blue-700">
-                                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                                      <strong>📍 How it works:</strong> Drag and drop an audio file here to see its waveform. 
-                                      You can then drag the handles on the waveform to set trim points visually.
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center justify-center space-x-2 text-sm">
-                                    <span>Supported formats:</span>
-                                    <span className="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">WAV</span>
-                                    <span className="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">MP3</span>
-                                    <span className="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">FLAC</span>
+                                  }}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onClick={handleLoadSampleFile}
+                                >
+                                  <div className="text-center text-blue-600 dark:text-blue-400">
+                                    <Music className="h-16 w-16 mx-auto mb-4" />
+                                    <h4 className="text-lg font-medium mb-2">Drop Audio File or Click to Browse</h4>
+                                    <p className="mb-4">Load a sample audio file to visually set trim points with waveform display</p>
+                                    <div className="bg-white dark:bg-blue-900/30 p-4 rounded-lg mb-4 border border-blue-200 dark:border-blue-700">
+                                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                                        <strong>📍 How it works:</strong> Drag and drop an audio file here to see its waveform. 
+                                        You can then drag the handles on the waveform to set trim points visually.
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center justify-center space-x-2 text-sm">
+                                      <span>Supported formats:</span>
+                                      <span className="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">WAV</span>
+                                      <span className="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">MP3</span>
+                                      <span className="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">FLAC</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <ErrorBoundary>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {activeAudioSubTab === 'processing' && (
                       <AudioProcessingConfig
                         processingOptions={formData.processingOptions}
                         onUpdateProcessingOptions={(processingOptions: ProcessingOptions) => setFormData({ ...formData, processingOptions })}
+                        activeSection="processing"
                       />
-                    </ErrorBoundary>
-                  )}
+                    )}
+                  </ErrorBoundary>
                 </div>
               </div>
             )}
@@ -963,7 +1122,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
           </div>
 
           {/* Form Actions */}
-          <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <Button
               type="button"
               variant="outline"
@@ -971,7 +1130,7 @@ export function ShowFormModal({ isOpen, onClose, editingShow }: ShowFormModalPro
             >
               Cancel
             </Button>
-            <Button type="submit">
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
               {editingShow ? 'Update Show' : 'Create Show'}
             </Button>
           </div>

@@ -133,6 +133,7 @@ export interface ShowProfile {
   autoProcessing: boolean
   processOnSchedule: boolean
   schedulePattern?: string // Cron pattern
+  processExistingFiles: boolean // Whether to process existing files in watch folders or only new ones
   
   // Monitoring and alerts
   enableNotifications: boolean

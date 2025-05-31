@@ -24,7 +24,12 @@ export class FileOperationsService {
   constructor() {
     this.allowedExtensions = (process.env.ALLOWED_EXTENSIONS || '.mp3,.wav,.flac,.aac,.m4a').split(',')
     this.tempDir = process.env.TEMP_DIR || './temp'
-    this.outputBaseDir = process.env.OUTPUT_BASE_DIR || path.join(process.cwd(), 'processed')
+    
+    // Calculate workspace root for better default output directory
+    const backendDir = process.cwd()
+    const workspaceRoot = path.resolve(backendDir, '..')
+    this.outputBaseDir = process.env.OUTPUT_BASE_DIR || path.join(workspaceRoot, 'Output')
+    
     this.audioProcessor = new AudioProcessorService()
   }
 
@@ -51,8 +56,31 @@ export class FileOperationsService {
       // Generate output filename and path
       const outputFilename = this.generateOutputFilename(file.filename, show)
       
-      // Use show's output directory or fall back to global default
-      const outputDir = show.outputDirectory || this.outputBaseDir
+      // Use show's output directory with proper path resolution
+      let outputDir: string
+      logger.info(`DEBUG FileOps: show.outputDirectory = "${show.outputDirectory}"`)
+      if (show.outputDirectory) {
+        // Clean the path by removing surrounding quotes if present
+        const cleanedOutputPath = show.outputDirectory.trim().replace(/^["']|["']$/g, '')
+        
+        if (path.isAbsolute(cleanedOutputPath)) {
+          // Already absolute - use as-is
+          outputDir = cleanedOutputPath
+          logger.info(`DEBUG FileOps: Using absolute path: ${outputDir}`)
+        } else {
+          // Relative path - resolve relative to workspace root
+          // process.cwd() is backend directory, go up one level to radio-automation-app
+          const backendDir = process.cwd()
+          const workspaceRoot = path.resolve(backendDir, '..')
+          outputDir = path.resolve(workspaceRoot, cleanedOutputPath)
+          logger.info(`DEBUG FileOps: Resolved relative path: ${outputDir}`)
+        }
+      } else {
+        // Fall back to global default
+        outputDir = this.outputBaseDir
+        logger.info(`DEBUG FileOps: Using fallback outputBaseDir = ${outputDir}`)
+      }
+      
       const outputPath = path.join(outputDir, outputFilename)
 
       // Ensure output directory exists

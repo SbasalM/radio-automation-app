@@ -3,11 +3,13 @@ import path from 'path'
 import { createLogger } from '../utils/logger'
 import { asyncHandler, validationError } from '../utils/errorHandler'
 import { StorageService } from '../services/storage'
+import { FileWatcherService } from '../services/fileWatcher'
 import { ApiResponse } from '../types'
 
 const router = Router()
 const logger = createLogger()
 const storage = StorageService.getInstance()
+const fileWatcherService = FileWatcherService.getInstance()
 
 // GET /api/shows - Get all shows
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
@@ -63,8 +65,24 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const settings = await storage.getSettings()
   const globalOutputDir = settings.globalOutputDirectory || path.join(process.cwd(), 'output')
   
-  // Use provided output directory or fall back to global default
-  const outputDirectory = showData.outputDirectory?.trim() || globalOutputDir
+  // Use provided output directory with proper path resolution
+  let outputDirectory: string
+  if (showData.outputDirectory?.trim()) {
+    const userOutputDir = showData.outputDirectory.trim()
+    if (path.isAbsolute(userOutputDir)) {
+      // Already absolute - use as-is
+      outputDirectory = userOutputDir
+    } else {
+      // Relative path - resolve relative to project root (radio-automation-app)
+      // process.cwd() is backend directory, go up one level to radio-automation-app
+      const backendDir = process.cwd()
+      const projectRoot = path.resolve(backendDir, '..')
+      outputDirectory = path.resolve(projectRoot, userOutputDir)
+    }
+  } else {
+    // Fall back to global default
+    outputDirectory = globalOutputDir
+  }
 
   // Set defaults and include all show data
   const newShowData = {
@@ -143,6 +161,27 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     })
   }
   
+  // Auto-reload file watcher if the show has watching enabled
+  if (updatedShow.enabled && updatedShow.autoProcessing) {
+    try {
+      await fileWatcherService.stopWatching()
+      
+      // Get all enabled shows and restart watching
+      const allShows = await storage.getAllShows()
+      const enabledShows = allShows.filter(show => show.enabled && show.autoProcessing)
+      const showIds = enabledShows.map(s => s.id)
+      
+      if (showIds.length > 0) {
+        await fileWatcherService.startWatchingShows(showIds)
+      }
+      
+      logger.info(`Auto-reloaded file watcher after updating show: ${updatedShow.name}`)
+    } catch (error) {
+      logger.error('Failed to auto-reload file watcher:', error)
+      // Don't fail the show update if watcher reload fails
+    }
+  }
+  
   logger.info(`Updated show: ${updatedShow.name} (${id})`)
   
   const response: ApiResponse = {
@@ -169,6 +208,25 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
       success: false,
       error: 'Show not found'
     })
+  }
+  
+  // Auto-reload file watcher after deletion
+  try {
+    await fileWatcherService.stopWatching()
+    
+    // Get remaining enabled shows and restart watching
+    const allShows = await storage.getAllShows()
+    const enabledShows = allShows.filter(show => show.enabled && show.autoProcessing)
+    const showIds = enabledShows.map(s => s.id)
+    
+    if (showIds.length > 0) {
+      await fileWatcherService.startWatchingShows(showIds)
+    }
+    
+    logger.info(`Auto-reloaded file watcher after deleting show: ${id}`)
+  } catch (error) {
+    logger.error('Failed to auto-reload file watcher:', error)
+    // Don't fail the show deletion if watcher reload fails
   }
   
   logger.info(`Deleted show: ${id}`)

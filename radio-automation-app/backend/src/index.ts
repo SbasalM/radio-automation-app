@@ -114,7 +114,12 @@ setupRoutes(app)
 app.get('/api/audio/:filename', (req: Request, res: Response): void => {
   try {
     const filename = req.params.filename
-    const filePath = path.join(__dirname, '../watch', filename)
+    
+    // Check temp directory first (for uploaded samples), then watch directory
+    let filePath = path.join(__dirname, '../temp-audio', filename)
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(__dirname, '../watch', filename)
+    }
     
     logger.info(`Audio request for: ${filename}`)
     
@@ -188,9 +193,15 @@ app.post('/api/audio/upload-sample', upload.single('audio'), (req: Request, res:
       return
     }
 
-    const tempFilePath = path.join(__dirname, '../watch', `temp_${Date.now()}_${req.file.originalname}`)
+    // Create a separate temp directory for sample files (not the watch directory)
+    const tempDir = path.join(__dirname, '../temp-audio')
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true })
+    }
+
+    const tempFilePath = path.join(tempDir, `temp_${Date.now()}_${req.file.originalname}`)
     
-    // Move uploaded file to watch directory temporarily
+    // Move uploaded file to temp directory (not watch directory)
     fs.moveSync(req.file.path, tempFilePath)
     
     res.json({ 
@@ -212,7 +223,12 @@ app.post('/api/audio/waveform/:filename', async (req: Request, res: Response): P
   try {
     const filename = req.params.filename
     const width = parseInt(req.query.width as string) || 800
-    const filePath = path.join(__dirname, '../watch', filename)
+    
+    // Check temp directory first (for uploaded samples), then watch directory
+    let filePath = path.join(__dirname, '../temp-audio', filename)
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(__dirname, '../watch', filename)
+    }
     
     logger.info(`Waveform request for: ${filename}, width: ${width}`)
     
@@ -243,7 +259,12 @@ app.post('/api/audio/waveform/:filename', async (req: Request, res: Response): P
 app.get('/api/audio/metadata/:filename', async (req: Request, res: Response): Promise<void> => {
   try {
     const filename = req.params.filename
-    const filePath = path.join(__dirname, '../watch', filename)
+    
+    // Check temp directory first (for uploaded samples), then watch directory
+    let filePath = path.join(__dirname, '../temp-audio', filename)
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(__dirname, '../watch', filename)
+    }
     
     logger.info(`Metadata request for: ${filename}`)
     
